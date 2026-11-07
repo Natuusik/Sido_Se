@@ -106,7 +106,7 @@ function renderDashboard() {
     </form>
   `;
     dashboardContainer.appendChild(addFormContainer);
-    // Автосвязка полей Кода и Названия
+    // 2. Автосвязка полей Кода и Названия
     const codeInput = document.getElementById('product-code');
     const titleInput = document.getElementById('product-title');
     if (codeInput && titleInput) {
@@ -140,8 +140,8 @@ function renderDashboard() {
                 title: title,
                 status: 'process',
                 pdfUrl: `./docs/${code}.pdf`,
-                quantity: 1, // Значение по умолчанию для количества
-                multiplier: 100 // Значение по умолчанию для множителя
+                quantity: 1,
+                multiplier: 100
             };
             const { error } = yield supabaseClient.from(TABLE_NAME).insert([newItem]);
             if (error) {
@@ -157,7 +157,7 @@ function renderDashboard() {
             }
         }));
     }
-    // 2. Только две секции (Completed Goods и In Progress)
+    // 3. Только две секции (Completed Goods и In Progress)
     const targetSections = [
         {
             key: 'ready',
@@ -185,7 +185,6 @@ function renderDashboard() {
           <button id="copy-${section.key}-table" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3.5 py-2 rounded-xl font-medium transition-colors shadow-sm flex items-center space-x-1"><span>📋 To Word</span></button>
         </div>`
             : '';
-        // Шапка: только количество элементов, без Total
         let tableContent = `
       <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div class="flex items-center space-x-3">
@@ -208,10 +207,7 @@ function renderDashboard() {
                 var _a, _b;
                 let actionButton = '';
                 if (section.key === 'process') {
-                    actionButton = `<button class="move-to-ready-btn bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-xl text-xs font-semibold transition-colors shadow-sm flex items-center space-x-1 shrink-0"><span>✅ Done</span></button>`;
-                }
-                else {
-                    actionButton = `<span class="text-xs text-emerald-700 font-semibold bg-emerald-100 px-3 py-2 rounded-xl shrink-0">Finished</span>`;
+                    actionButton = `<button onclick="markAsReady(${item.id})" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-xl text-xs font-semibold transition-colors shadow-sm shrink-0">✅ Done</button>`;
                 }
                 const text = `${item.title} ${item.code}`.toUpperCase();
                 let borderAccentClass = 'border-l-stone-300';
@@ -229,8 +225,8 @@ function renderDashboard() {
                 }
                 const currentQty = (_a = item.quantity) !== null && _a !== void 0 ? _a : 1;
                 const currentMultiplier = (_b = item.multiplier) !== null && _b !== void 0 ? _b : 100;
-                const rowTotal = currentQty * currentMultiplier; // Знак умножения на месте
-                // Карточка товара: на мобилках вертикально, на ПК (xl) в одну строчку
+                const rowTotal = currentQty * currentMultiplier;
+                // 4. Карточка товара: на мобилках вертикально, на ПК (xl) в одну строчку
                 tableContent += `
           <div draggable="true" data-id="${item.id}" class="draggable-row flex flex-col xl:flex-row items-start xl:items-center justify-between p-4 bg-white rounded-2xl border border-stone-200/80 border-l-4 ${borderAccentClass} shadow-sm transition-all hover:shadow-md gap-4">
             
@@ -273,25 +269,67 @@ function renderDashboard() {
         sectionDiv.innerHTML = tableContent;
         dashboardContainer.appendChild(sectionDiv);
     });
+    // --- НАДЕЖНЫЙ ПРИВЯЗАТЕЛЬ СОБЫТИЙ ВНУТРИ РЕНДЕРИНГА ---
+    const currentContainer = document.getElementById('dashboard-container');
+    if (currentContainer) {
+        // Удаляем старый клонированный обработчик через замену узла или просто вешаем свежий на текущий HTML
+        // Самый простой способ без утечек — вешать прямо на кнопки внутри контейнера:
+        currentContainer.querySelectorAll('.move-to-ready-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => __awaiter(this, void 0, void 0, function* () {
+                const id = Number(btn.getAttribute('data-id'));
+                if (!id)
+                    return;
+                const { error } = yield supabaseClient
+                    .from(TABLE_NAME)
+                    .update({ status: 'ready' })
+                    .eq('id', id);
+                if (error) {
+                    console.error('Error updating status:', error);
+                }
+                else {
+                    lastUpdateTime = new Date();
+                    renderLastUpdateTime();
+                    yield fetchItemsFromSupabase();
+                }
+            }));
+        });
+        currentContainer.querySelectorAll('.delete-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => __awaiter(this, void 0, void 0, function* () {
+                const id = Number(btn.getAttribute('data-id'));
+                if (!id)
+                    return;
+                const { error } = yield supabaseClient
+                    .from(TABLE_NAME)
+                    .delete()
+                    .eq('id', id);
+                if (error) {
+                    console.error('Error deleting item:', error);
+                }
+                else {
+                    lastUpdateTime = new Date();
+                    renderLastUpdateTime();
+                    yield fetchItemsFromSupabase();
+                }
+            }));
+        });
+    }
     // Привязка обработчиков для кнопок печати и копирования (Word) по секциям
     targetSections.forEach(section => {
         const printBtn = document.getElementById(`print-${section.key}-table`);
         if (printBtn) {
             printBtn.addEventListener('click', () => {
-                // Логика печати секции (или вызов вашей функции печати)
                 window.print();
             });
         }
         const copyBtn = document.getElementById(`copy-${section.key}-table`);
         if (copyBtn) {
             copyBtn.addEventListener('click', () => {
-                // Собираем все элементы этой секции
                 const groupItems = items.filter(item => item.status === section.key);
                 if (groupItems.length === 0) {
                     alert('В этой секции нет данных для копирования.');
                     return;
                 }
-                // Формируем HTML-таблицу для идеальной вставки в Word (без строки ИТОГО)
+                // 5. Формируем HTML-таблицу для идеальной вставки в Word (без строки ИТОГО)
                 let htmlTable = `
           <table border="1" cellspacing="0" cellpadding="5" style="border-collapse: collapse; font-family: Arial, sans-serif; font-size: 14px; width: 100%;">
             <thead>
@@ -326,7 +364,6 @@ function renderDashboard() {
             </tbody>
           </table>
         `;
-                // Копируем таблицу в буфер обмена для Word
                 const clipboardItem = new ClipboardItem({
                     "text/html": new Blob([htmlTable], { type: "text/html" }),
                     "text/plain": new Blob([htmlTable.replace(/<[^>]*>?/gm, '')], { type: "text/plain" })
@@ -345,14 +382,12 @@ function renderDashboard() {
         input.addEventListener('change', (e) => __awaiter(this, void 0, void 0, function* () {
             const target = e.target;
             const id = Number(target.getAttribute('data-id'));
-            const field = target.getAttribute('data-field'); // 'quantity' или 'multiplier'
+            const field = target.getAttribute('data-field');
             const val = Number(target.value) || 0;
-            // Обновляем локально в массиве
             const targetItem = items.find(i => i.id === id);
             if (targetItem && field) {
                 targetItem[field] = val;
             }
-            // Сохраняем в Supabase
             try {
                 const updateObj = {};
                 updateObj[field] = val;
@@ -361,17 +396,13 @@ function renderDashboard() {
             catch (err) {
                 console.error('Error updating in Supabase:', err);
             }
-            // Перерисовываем дашборд для обновления расчетов
             renderDashboard();
         }));
     });
 }
-// Инициализация при старте
-renderHeaderDate();
-renderLastUpdateTime();
-renderDashboard();
-fetchItemsFromSupabase();
-// Обработка кликов по кнопкам (Done и Delete)
+// ==========================================
+// 6. Глобальный обработчик кликов (вешается один раз на старте)
+// ==========================================
 if (dashboardContainer) {
     dashboardContainer.addEventListener('click', (e) => __awaiter(void 0, void 0, void 0, function* () {
         const target = e.target;
@@ -415,3 +446,31 @@ if (dashboardContainer) {
         }
     }));
 }
+// Прямая функция для перевода в статус ready
+// Принудительно вешаем функцию в глобальный объект window, чтобы HTML её видел
+window.markAsReady = function (itemId) {
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            const { error } = yield supabaseClient
+                .from(TABLE_NAME)
+                .update({ status: 'ready' })
+                .eq('id', itemId);
+            if (error) {
+                console.error('Error updating status:', error);
+                alert('Ошибка при обновлении статуса: ' + error.message);
+            }
+            else {
+                lastUpdateTime = new Date();
+                renderLastUpdateTime();
+                yield fetchItemsFromSupabase();
+            }
+        }
+        catch (err) {
+            console.error('Exception in markAsReady:', err);
+        }
+    });
+};
+// Инициализация при старте
+renderHeaderDate();
+renderLastUpdateTime();
+fetchItemsFromSupabase();
