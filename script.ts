@@ -193,7 +193,7 @@ function renderDashboard(): void {
     }
   ];
 
- targetSections.forEach(section => {
+  targetSections.forEach(section => {
     const groupItems = items.filter(item => item.status === section.key);
     const count = groupItems.length;
     
@@ -229,10 +229,10 @@ function renderDashboard(): void {
     } else {
       tableContent += `<div class="space-y-3">`;
 
- groupItems.forEach((item: any, index) => {
+      groupItems.forEach((item: any, index) => {
         let actionButton = '';
         if (section.key === 'process') {
-          actionButton = `<button class="move-to-ready-btn bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-xl text-xs font-semibold transition-colors shadow-sm flex items-center space-x-1 shrink-0" data-id="${item.id}"><span>✅ Done</span></button>`;
+          actionButton = `<button class="move-to-ready-btn bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-xl text-xs font-semibold transition-colors shadow-sm shrink-0" data-id="${item.id}">✅ Done</button>`;
         } else {
           actionButton = `<span class="text-xs text-emerald-700 font-semibold bg-emerald-100 px-3 py-2 rounded-xl shrink-0">Finished</span>`;
         }
@@ -252,7 +252,7 @@ function renderDashboard(): void {
 
         const currentQty = item.quantity ?? 1;
         const currentMultiplier = item.multiplier ?? 100;
-        const rowTotal = currentQty * currentMultiplier; // Знак умножения на месте
+        const rowTotal = currentQty * currentMultiplier;
 
         // Карточка товара: на мобилках вертикально, на ПК (xl) в одну строчку
         tableContent += `
