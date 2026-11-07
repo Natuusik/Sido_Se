@@ -492,8 +492,8 @@ if (dashboardContainer) {
 
 
 // Прямая функция для перевода в статус ready
-// Глобальная функция для перевода в статус ready (чтобы onclick её видел)
-async function markAsReady(itemId: number) {
+// Принудительно вешаем функцию в глобальный объект window, чтобы HTML её видел
+(window as any).markAsReady = async function(itemId: number) {
   try {
     const { error } = await supabaseClient
       .from(TABLE_NAME)
@@ -511,8 +511,7 @@ async function markAsReady(itemId: number) {
   } catch (err) {
     console.error('Exception in markAsReady:', err);
   }
-}
-
+};
 // Инициализация при старте
 renderHeaderDate();
 renderLastUpdateTime();
