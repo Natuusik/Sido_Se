@@ -7,58 +7,177 @@ const SUPABASE_ANON_KEY = 'sb_publishable_frIjzGAOaW77jegazxN-_Q_OUqN-hzO';
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const TABLE_NAME = 'sidose_tasks'; // Должно точно совпадать с названием в Supabase!
 
+interface CatalogItem {
+  code: string;
+  title: string;
+  pdfUrl: string;
+}
 
+interface ProductionItem extends CatalogItem {
+  id: number;
+  status: 'ready' | 'process' | 'boxes'; // <--- ОБЯЗАТЕЛЬНО должны быть перечислены все три через вертикальную черту
+}
 
-let items: any[] = [];
-let lastUpdateTime = new Date();
+const catalogDatabase: CatalogItem[] = [
+  { code: "714002", title: "End Paper A4 Portrait White", pdfUrl: "./docs/714002.pdf" },
+  { code: "714003", title: "End Paper A4 Landscape White", pdfUrl: "./docs/doc-2.pdf" },
+  { code: "7714021", title: "End Paper A4 Portrait HD White End papers", pdfUrl: "./docs/7714021.pdf" },
+  { code: "714005", title: "End Paper A4 Landscape Color", pdfUrl: "./docs/doc-4.pdf" },
+  { code: "732008", title: "BXT Letter Portrait White", pdfUrl: "./docs/732008.pdf" },
+  { code: "792008", title: "Inkjet 329x530", pdfUrl: "./docs/792008.pdf" },
+  { code: "792007", title: "Lazer 329x500", pdfUrl: "./docs/792007.pdf" },
+  { code: "734007", title: "BXT A4 Portrait Black", pdfUrl: "./docs/doc-6.pdf" }
+];
 
-// Форматирование названия
+let items: ProductionItem[] = [];
+let lastUpdateTime: Date = new Date();
+
+const dashboardContainer = document.getElementById('dashboard-container');
+
+function renderHeaderDate(): void {
+  const dateContainer = document.getElementById('current-date');
+  if (!dateContainer) return;
+
+  const options: Intl.DateTimeFormatOptions = { 
+    weekday: 'long', 
+    year: 'numeric', 
+    month: 'long', 
+    day: 'numeric' 
+  };
+  const today = new Date().toLocaleDateString('en-US', options);
+  dateContainer.innerText = today.charAt(0).toUpperCase() + today.slice(1);
+}
+
+function renderLastUpdateTime(): void {
+  const timeContainer = document.getElementById('last-update-time');
+  if (!timeContainer) return;
+
+  const now = lastUpdateTime;
+  const hours = ('0' + now.getHours()).slice(-2);
+  const minutes = ('0' + now.getMinutes()).slice(-2);
+  const seconds = ('0' + now.getSeconds()).slice(-2);
+
+  timeContainer.innerText = `Updated: ${hours}:${minutes}:${seconds}`;
+}
+
 function formatTitle(title: string): string {
-  return title || '';
-}
-
-// Рендер даты в шапке
-function renderHeaderDate() {
-  const dateEl = document.getElementById('header-date');
-  if (dateEl) {
-    const options: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'long', day: 'numeric' };
-    dateEl.textContent = new Date().toLocaleDateString('ru-RU', options);
-  }
-}
-
-// Рендер времени последнего обновления
-function renderLastUpdateTime() {
-  const timeEl = document.getElementById('last-update-time');
-  if (timeEl) {
-    timeEl.textContent = lastUpdateTime.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  }
+  return title.replace(/black/gi, function(match) {
+    return `<span style="font-style: italic; text-decoration: underline;">${match}</span>`;
+  });
 }
 
 // Загрузка данных из Supabase
 async function fetchItemsFromSupabase() {
-  const { data, error } = await supabaseClient
-    .from(TABLE_NAME)
-    .select('*')
-    .order('id', { ascending: true });
-
-  if (error) {
-    console.error('Ошибка загрузки данных:', error.message);
-    return;
+  try {
+    const { data, error } = await supabaseClient.from(TABLE_NAME).select('*');
+    if (error) {
+      console.error('Supabase error:', error.message);
+    } else if (data) {
+      items = data as ProductionItem[];
+    }
+  } catch (err) {
+    console.error('Fetch exception:', err);
+  } finally {
+    renderDashboard();
   }
-
-  items = data || [];
-  renderDashboard();
-  renderLastUpdateTime();
 }
 
-// Главная функция отрисовки дашборда и таблиц
-function renderDashboard() {
-  const dashboardContainer = document.getElementById('dashboard-container');
+
+function renderDashboard(): void {
   if (!dashboardContainer) return;
 
   dashboardContainer.innerHTML = '';
 
-  // Секции таблиц
+  // 1. Форма добавления задачи
+  const addFormContainer = document.createElement('div');
+  addFormContainer.id = 'add-item-form-container';
+  addFormContainer.className = 'bg-white rounded-2xl p-6 mb-8 border border-stone-200 shadow-md';
+  addFormContainer.innerHTML = `
+    <h3 class="text-lg font-bold text-stone-900 mb-4 flex items-center space-x-2">
+      <span>➕ Add Item to Work</span>
+    </h3>
+    <form id="add-item-form" class="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+      <div class="md:col-span-4">
+        <label class="block text-xs font-semibold text-stone-600 mb-1">Code</label>
+        <input type="text" id="product-code" list="code-list" placeholder="Enter code..." class="w-full bg-stone-50 border border-stone-300 text-stone-800 text-sm rounded-xl p-2.5 focus:outline-none focus:border-blue-500" required />
+        <datalist id="code-list">
+          ${catalogDatabase.map(item => `<option value="${item.code}">${item.title}</option>`).join('')}
+        </datalist>
+      </div>
+      <div class="md:col-span-6">
+        <label class="block text-xs font-semibold text-stone-600 mb-1">Title (or select from database)</label>
+        <input type="text" id="product-title" list="title-list" placeholder="Product title..." class="w-full bg-stone-50 border border-stone-300 text-stone-800 text-sm rounded-xl p-2.5 focus:outline-none focus:border-blue-500" required />
+        <datalist id="title-list">
+          ${catalogDatabase.map(item => `<option value="${item.title}">${item.code}</option>`).join('')}
+        </datalist>
+      </div>
+      <div class="md:col-span-2">
+        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs py-2.5 px-3 rounded-xl transition-colors shadow-sm whitespace-nowrap">Add Item</button>
+      </div>
+    </form>
+  `;
+  
+  dashboardContainer.appendChild(addFormContainer);
+
+  // Автосвязка полей Кода и Названия
+  const codeInput = document.getElementById('product-code') as HTMLInputElement;
+  const titleInput = document.getElementById('product-title') as HTMLInputElement;
+
+  if (codeInput && titleInput) {
+    codeInput.addEventListener('input', () => {
+      const found = catalogDatabase.find(i => i.code === codeInput.value.trim());
+      if (found) {
+        titleInput.value = found.title;
+      }
+    });
+
+    titleInput.addEventListener('input', () => {
+      const found = catalogDatabase.find(i => i.title === titleInput.value.trim());
+      if (found) {
+        codeInput.value = found.code;
+      }
+    });
+  }
+
+  // Обработчик отправки формы добавления
+  const addItemForm = document.getElementById('add-item-form') as HTMLFormElement;
+  if (addItemForm) {
+    addItemForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const cInput = document.getElementById('product-code') as HTMLInputElement;
+      const tInput = document.getElementById('product-title') as HTMLInputElement;
+
+      const code = cInput.value.trim();
+      const title = tInput.value.trim();
+
+      if (!code || !title) return;
+
+      const newItem = {
+        id: Date.now(),
+        code: code,
+        title: title,
+        status: 'process' as const,
+        pdfUrl: `./docs/${code}.pdf`,
+        quantity: 1,  // Значение по умолчанию для количества
+        multiplier: 100 // Значение по умолчанию для множителя
+      };
+
+      const { error } = await supabaseClient.from(TABLE_NAME).insert([newItem]);
+      if (error) {
+        console.error('Error inserting item:', error.message);
+        alert('Ошибка сохранения в Supabase: ' + error.message);
+      } else {
+        cInput.value = '';
+        tInput.value = '';
+        lastUpdateTime = new Date();
+        renderLastUpdateTime();
+        await fetchItemsFromSupabase();
+      }
+    });
+  }
+
+  // 2. Только две секции (Completed Goods и In Progress)
   const targetSections = [
     { 
       key: 'ready', 
@@ -76,37 +195,50 @@ function renderDashboard() {
 
   targetSections.forEach(section => {
     const groupItems = items.filter(item => item.status === section.key);
+    const count = groupItems.length;
+    
+    // Считаем общую сумму по секции (количество * множитель для каждого товара)
+    const totalSum = groupItems.reduce((acc, item: any) => {
+      const q = Number(item.quantity) || 1;
+      const m = Number(item.multiplier) ?? 100;
+      return acc + (q * m);
+    }, 0);
     
     const sectionDiv = document.createElement('div');
     sectionDiv.id = `${section.key}-section`;
     sectionDiv.className = `rounded-3xl p-6 md:p-8 border mb-8 ${section.bgClass}`;
-    
-    const actionButtonsHtml = groupItems.length > 0
-      ? `<div class="flex items-center gap-2 no-print w-full sm:w-auto">
-          <button id="print-${section.key}-table" class="flex-1 sm:flex-none bg-stone-800 hover:bg-stone-900 text-white text-xs px-3.5 py-2.5 rounded-xl font-medium transition-colors shadow-sm flex items-center justify-center gap-1.5"><span>🖨️ Print / PDF</span></button>
-          <button id="copy-${section.key}-table" class="flex-1 sm:flex-none bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3.5 py-2.5 rounded-xl font-medium transition-colors shadow-sm flex items-center justify-center gap-1.5"><span>📋 To Word</span></button>
-         </div>`
+
+    const actionButtonsHtml = count > 0
+      ? `<div class="flex items-center space-x-2 no-print">
+          <button id="print-${section.key}-table" class="bg-stone-800 hover:bg-stone-900 text-white text-xs px-3.5 py-2 rounded-xl font-medium transition-colors shadow-sm flex items-center space-x-1"><span>🖨️ Print / PDF</span></button>
+          <button id="copy-${section.key}-table" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3.5 py-2 rounded-xl font-medium transition-colors shadow-sm flex items-center space-x-1"><span>📋 To Word</span></button>
+        </div>`
       : '';
 
     let tableContent = `
-      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-        <h2 class="text-lg md:text-xl font-bold text-stone-900 flex items-center flex-wrap gap-2">
+      <div class="flex items-center justify-between mb-6">
+        <h2 class="text-xl font-bold text-stone-900 flex items-center space-x-3">
           <span>${section.title}</span>
-          <span class="text-xs px-3 py-1 rounded-full font-semibold ${section.badgeClass}">${groupItems.length} items</span>
+          <span class="text-xs px-3 py-1 rounded-full font-semibold ${section.badgeClass}">
+            ${count} items (Total: ${totalSum})
+          </span>
         </h2>
         ${actionButtonsHtml}
       </div>
     `;
 
-    if (groupItems.length === 0) {
+    if (count === 0) {
       tableContent += `<p class="text-stone-400 text-sm italic py-2">No items in this category.</p>`;
     } else {
       tableContent += `<div class="space-y-3">`;
 
-      groupItems.forEach((item, index) => {
-        const actionButton = section.key === 'process' 
-          ? `<button class="move-to-ready-btn bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-xl text-xs font-semibold transition-colors shadow-sm flex items-center space-x-1" data-id="${item.id}"><span>✅ Done</span></button>`
-          : `<span class="text-xs text-emerald-700 font-semibold bg-emerald-100 px-3 py-2 rounded-xl">Finished</span>`;
+      groupItems.forEach((item: any, index) => {
+        let actionButton = '';
+        if (section.key === 'process') {
+          actionButton = `<button class="move-to-ready-btn bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-xl text-xs font-semibold transition-colors shadow-sm flex items-center space-x-1" data-id="${item.id}"><span>✅ Done</span></button>`;
+        } else {
+          actionButton = `<span class="text-xs text-emerald-700 font-semibold bg-emerald-100 px-3 py-2 rounded-xl">Finished</span>`;
+        }
 
         const text = `${item.title} ${item.code}`.toUpperCase();
         let borderAccentClass = 'border-l-stone-300';
@@ -121,42 +253,35 @@ function renderDashboard() {
           borderAccentClass = 'border-l-purple-500 hover:bg-purple-50/50';
         }
 
-        const currentBoxes = item.boxes || 0;
+        const currentQty = item.quantity ?? 1;
+        const currentMultiplier = item.multiplier ?? 100;
+        const rowTotal = currentQty * currentMultiplier;
 
         tableContent += `
-          <div draggable="true" data-id="${item.id}" class="draggable-row flex flex-col md:flex-row items-start md:items-center justify-between p-4 bg-white rounded-2xl border border-stone-200/80 border-l-4 ${borderAccentClass} shadow-sm transition-all hover:shadow-md gap-4">
-            
-            <!-- Левая часть: Порядковый номер, PDF и название -->
-            <div class="flex flex-col md:flex-row md:items-center gap-3 w-full md:w-auto flex-1">
-              <div class="flex items-center space-x-3">
-                <span class="text-stone-300 hover:text-stone-500 cursor-grab select-none text-base" title="Drag to reorder">⠿</span>
-                <span class="text-stone-700 font-extrabold text-sm w-6 text-center bg-stone-100 py-1 rounded-lg">${index + 1}</span>
-                <a href="${item.pdfUrl}" target="_blank" title="Open PDF" class="group flex items-center space-x-2 bg-stone-50 hover:bg-blue-50 px-3 py-1.5 rounded-xl border border-stone-200 transition-colors">
-                  <span class="font-mono font-bold text-blue-600 text-sm">${item.code}</span>
-                  <span class="text-xs text-stone-400 group-hover:text-blue-600">📄 PDF</span>
-                </a>
-              </div>
-
-              <div class="font-medium text-stone-800 text-sm md:text-base w-full md:w-auto pl-0 md:pl-2">
+          <div draggable="true" data-id="${item.id}" class="draggable-row flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-white rounded-2xl border border-stone-200/80 border-l-4 ${borderAccentClass} shadow-sm transition-all hover:shadow-md cursor-grab active:cursor-grabbing gap-4">
+            <div class="flex items-center space-x-3 w-full sm:w-auto">
+              <span class="text-stone-300 hover:text-stone-500 cursor-grab select-none text-base" title="Drag to reorder">⠿</span>
+              <span class="text-stone-400 font-bold text-xs w-6 text-center bg-stone-100 py-1 rounded-lg">${index + 1}</span>
+              <a href="${item.pdfUrl}" target="_blank" title="Open PDF" class="group flex items-center space-x-2 bg-stone-50 hover:bg-blue-50 px-3 py-1.5 rounded-xl border border-stone-200 transition-colors">
+                <span class="font-mono font-bold text-blue-600 text-sm">${item.code}</span>
+                <span class="text-xs text-stone-400 group-hover:text-blue-600">📄 PDF</span>
+              </a>
+              <div class="font-medium text-stone-800 text-sm md:text-base flex-1 sm:flex-none">
                 ${formatTitle(item.title)}
               </div>
             </div>
-
-            <!-- Центральная часть: Ручной ввод коробок и автоподсчет -->
-            <div class="flex items-center gap-2 w-full md:w-auto justify-start md:justify-center bg-stone-50 px-3 py-2 rounded-xl border border-stone-200">
-              <span class="text-xs text-stone-500 font-medium">Коробок:</span>
-              <input type="number" min="0" value="${currentBoxes}" data-id="${item.id}" 
-                class="boxes-input w-16 px-2 py-1 text-xs font-bold text-stone-900 bg-white border border-stone-300 rounded-lg focus:outline-none focus:border-blue-500 text-center" 
-                placeholder="0">
-              <span class="text-xs text-stone-400">×</span>
-              <span class="text-xs text-stone-600 font-semibold">шт =</span>
-              <span class="text-xs font-extrabold text-blue-600 total-output min-w-[35px] text-right">${currentBoxes} шт</span>
-            </div>
-
-            <!-- Правая часть с кнопками действий -->
-            <div class="flex items-center justify-end space-x-2 w-full md:w-auto no-print pt-2 md:pt-0 border-t md:border-t-0 border-stone-100">
-              ${actionButton}
-              <button class="delete-btn bg-stone-50 hover:bg-rose-50 text-stone-400 hover:text-rose-600 border border-stone-200 p-2 rounded-xl text-xs transition-colors shadow-xs" data-id="${item.id}" title="Delete item">🗑️</button>
+            <div class="flex items-center space-x-3 w-full sm:w-auto justify-end">
+              <!-- Интерактивные поля ввода: Количество и Множитель -->
+              <div class="flex items-center space-x-1.5 bg-stone-50 px-3 py-1.5 rounded-xl border border-stone-200">
+                <input type="number" min="1" value="${currentQty}" data-id="${item.id}" data-field="quantity" class="item-calc-input w-12 text-center bg-white border border-stone-300 rounded-lg text-xs py-1 focus:outline-none focus:border-blue-500 font-mono font-bold" />
+                <span class="text-xs font-semibold text-stone-600">×</span>
+                <input type="number" value="${currentMultiplier}" data-id="${item.id}" data-field="multiplier" class="item-calc-input w-14 text-center bg-white border border-stone-300 rounded-lg text-xs py-1 focus:outline-none focus:border-blue-500 font-mono font-bold" />
+                <span class="text-xs font-semibold text-stone-600">= <span class="text-blue-600 font-bold">${rowTotal}</span></span>
+              </div>
+              <div class="flex items-center space-x-2 no-print pt-2 sm:pt-0 border-t sm:border-t-0 border-stone-100">
+                ${actionButton}
+                <button class="delete-btn bg-stone-50 hover:bg-rose-50 text-stone-400 hover:text-rose-600 border border-stone-200 p-2 rounded-xl text-xs transition-colors shadow-xs" data-id="${item.id}" title="Delete item">🗑️</button>
+              </div>
             </div>
           </div>
         `;
@@ -168,111 +293,83 @@ function renderDashboard() {
     sectionDiv.innerHTML = tableContent;
     dashboardContainer.appendChild(sectionDiv);
   });
+
+  // Привязка событий для обоих полей (quantity и multiplier)
+  document.querySelectorAll('.item-calc-input').forEach(input => {
+    input.addEventListener('change', async (e) => {
+      const target = e.target as HTMLInputElement;
+      const id = Number(target.getAttribute('data-id'));
+      const field = target.getAttribute('data-field'); // 'quantity' или 'multiplier'
+      const val = Number(target.value) || 0;
+
+      // Обновляем локально в массиве
+      const targetItem: any = items.find(i => i.id === id);
+      if (targetItem && field) {
+        targetItem[field] = val;
+      }
+
+      // Сохраняем в Supabase (убедитесь, что колонки quantity и multiplier созданы в таблице)
+      try {
+        const updateObj: any = {};
+        updateObj[field!] = val;
+        await supabaseClient.from(TABLE_NAME).update(updateObj).eq('id', id);
+      } catch (err) {
+        console.error('Error updating in Supabase:', err);
+      }
+
+      // Перерисовываем дашборд для обновления расчетов
+      renderDashboard();
+    });
+  });
 }
+// Инициализация при старте
+renderHeaderDate();
+renderLastUpdateTime();
+renderDashboard();
+fetchItemsFromSupabase();
+// Обработка кликов по кнопкам (Done и Delete)
+if (dashboardContainer) {
+  dashboardContainer.addEventListener('click', async (e) => {
+    const target = e.target as HTMLElement;
 
-// Глобальные обработчики событий
+    const doneBtn = target.closest('.move-to-ready-btn');
+    if (doneBtn) {
+      const idStr = doneBtn.getAttribute('data-id');
+      if (idStr) {
+        const itemId = Number(idStr);
+        const { error } = await supabaseClient
+          .from(TABLE_NAME)
+          .update({ status: 'ready' })
+          .eq('id', itemId);
 
-// 1. Мгновенный пересчет на экране при вводе коробок
-document.addEventListener('input', (e) => {
-  const target = e.target as HTMLElement;
-  if (target && target.classList.contains('boxes-input')) {
-    const input = target as HTMLInputElement;
-    const row = input.closest('.draggable-row');
-    const boxes = Number(input.value) || 0;
-
-    const totalOutput = row?.querySelector('.total-output');
-    if (totalOutput) {
-      totalOutput.textContent = `${boxes} шт`;
+        if (error) {
+          console.error('Error updating status:', error);
+        } else {
+          lastUpdateTime = new Date();
+          renderLastUpdateTime();
+          await fetchItemsFromSupabase();
+        }
+      }
     }
-  }
-});
 
-// 2. Сохранение количества коробок в базу Supabase при изменении
-document.addEventListener('change', async (e) => {
-  const target = e.target as HTMLElement;
-  if (target && target.classList.contains('boxes-input')) {
-    const input = target as HTMLInputElement;
-    const id = Number(input.getAttribute('data-id'));
-    const boxes = Number(input.value) || 0;
+    const deleteBtn = target.closest('.delete-btn');
+    if (deleteBtn) {
+      const idStr = deleteBtn.getAttribute('data-id');
+      if (idStr) {
+        const itemId = Number(idStr);
+        const { error } = await supabaseClient
+          .from(TABLE_NAME)
+          .delete()
+          .eq('id', itemId);
 
-    const { error } = await supabaseClient
-      .from(TABLE_NAME)
-      .update({ boxes: boxes })
-      .eq('id', id);
-
-    if (error) {
-      console.error('Ошибка сохранения коробок:', error.message);
-    }
-  }
-});
-
-// 3. Обработчик кликов (удаление и перевод в готовые)
-document.addEventListener('click', async (e) => {
-  const target = e.target as HTMLElement;
-  
-  // Кнопка удаления
-  const deleteBtn = target.closest('.delete-btn');
-  if (deleteBtn) {
-    const id = Number(deleteBtn.getAttribute('data-id'));
-    const { error } = await supabaseClient.from(TABLE_NAME).delete().eq('id', id);
-    if (!error) {
-      await fetchItemsFromSupabase();
-    } else {
-      console.error('Ошибка удаления:', error.message);
-    }
-  }
-
-  // Кнопка перевода в Готовые (Done)
-  const moveToReadyBtn = target.closest('.move-to-ready-btn');
-  if (moveToReadyBtn) {
-    const id = Number(moveToReadyBtn.getAttribute('data-id'));
-    const { error } = await supabaseClient.from(TABLE_NAME).update({ status: 'ready' }).eq('id', id);
-    if (!error) {
-      await fetchItemsFromSupabase();
-    } else {
-      console.error('Ошибка обновления статуса:', error.message);
-    }
-  }
-});
-
-// 4. Обработчик формы добавления нового товара (код и название уходят в таблицу вниз)
-const addItemForm = document.getElementById('add-item-form') as HTMLFormElement;
-if (addItemForm) {
-  addItemForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    
-    const codeInput = document.getElementById('product-code') as HTMLInputElement;
-    const titleInput = document.getElementById('product-title') as HTMLInputElement;
-
-    const code = codeInput ? codeInput.value.trim() : '';
-    const title = titleInput ? titleInput.value.trim() : '';
-
-    if (!code || !title) return;
-
-    const newItem = {
-      id: Date.now(),
-      code: code,
-      title: title,
-      status: 'process' as const,
-      pdfUrl: `./docs/${code}.pdf`,
-      boxes: 0
-    };
-
-    const { error } = await supabaseClient.from(TABLE_NAME).insert([newItem]);
-    if (error) {
-      console.error('Error inserting item:', error.message);
-      alert('Ошибка сохранения в Supabase: ' + error.message);
-    } else {
-      if (codeInput) codeInput.value = '';
-      if (titleInput) titleInput.value = '';
-      lastUpdateTime = new Date();
-      renderLastUpdateTime();
-      await fetchItemsFromSupabase();
+        if (error) {
+          console.error('Error deleting item:', error);
+        } else {
+          lastUpdateTime = new Date();
+          renderLastUpdateTime();
+          await fetchItemsFromSupabase();
+        }
+      }
     }
   });
 }
-
-// Инициализация при старте страницы
-renderHeaderDate();
-renderLastUpdateTime();
-fetchItemsFromSupabase();
