@@ -11,12 +11,12 @@ const TABLE_NAME = 'sidose_tasks'; // Должно точно совпадать
 let items: any[] = [];
 let lastUpdateTime = new Date();
 
-// Форматирование названия (если нужно убрать лишние теги или привести к виду)
+// Форматирование названия
 function formatTitle(title: string): string {
   return title || '';
 }
 
-// Рендер даты в шапке (если используется)
+// Рендер даты в шапке
 function renderHeaderDate() {
   const dateEl = document.getElementById('header-date');
   if (dateEl) {
@@ -57,7 +57,7 @@ function renderDashboard() {
 
   dashboardContainer.innerHTML = '';
 
-  // 2. Секции таблиц
+  // Секции таблиц
   const targetSections = [
     { 
       key: 'ready', 
@@ -125,11 +125,11 @@ function renderDashboard() {
         tableContent += `
           <div draggable="true" data-id="${item.id}" class="draggable-row flex flex-col md:flex-row items-start md:items-center justify-between p-4 bg-white rounded-2xl border border-stone-200/80 border-l-4 ${borderAccentClass} shadow-sm transition-all hover:shadow-md gap-4">
             
-            <!-- Левая часть: Номер, PDF и название (адаптивная колонка) -->
+            <!-- Левая часть: Порядковый номер, PDF и название -->
             <div class="flex flex-col md:flex-row md:items-center gap-3 w-full md:w-auto flex-1">
               <div class="flex items-center space-x-3">
                 <span class="text-stone-300 hover:text-stone-500 cursor-grab select-none text-base" title="Drag to reorder">⠿</span>
-                <span class="text-stone-400 font-bold text-xs w-6 text-center bg-stone-100 py-1 rounded-lg">${index + 1}</span>
+                <span class="text-stone-700 font-extrabold text-sm w-6 text-center bg-stone-100 py-1 rounded-lg">${index + 1}</span>
                 <a href="${item.pdfUrl}" target="_blank" title="Open PDF" class="group flex items-center space-x-2 bg-stone-50 hover:bg-blue-50 px-3 py-1.5 rounded-xl border border-stone-200 transition-colors">
                   <span class="font-mono font-bold text-blue-600 text-sm">${item.code}</span>
                   <span class="text-xs text-stone-400 group-hover:text-blue-600">📄 PDF</span>
@@ -141,7 +141,7 @@ function renderDashboard() {
               </div>
             </div>
 
-            <!-- Центральная часть: Ручной ввод коробок + Автоматический подсчет -->
+            <!-- Центральная часть: Ручной ввод коробок и автоподсчет -->
             <div class="flex items-center gap-2 w-full md:w-auto justify-start md:justify-center bg-stone-50 px-3 py-2 rounded-xl border border-stone-200">
               <span class="text-xs text-stone-500 font-medium">Коробок:</span>
               <input type="number" min="0" value="${currentBoxes}" data-id="${item.id}" 
@@ -169,9 +169,9 @@ function renderDashboard() {
   });
 }
 
-// Глобальные обработчики событий (вешаются один раз)
+// Глобальные обработчики событий
 
-// 1. Мгновенный пересчет на экране при вводе
+// 1. Мгновенный пересчет на экране при вводе коробок
 document.addEventListener('input', (e) => {
   const target = e.target as HTMLElement;
   if (target && target.classList.contains('boxes-input')) {
@@ -186,7 +186,7 @@ document.addEventListener('input', (e) => {
   }
 });
 
-// 2. Сохранение количества коробок в Supabase при изменении
+// 2. Сохранение количества коробок в базу Supabase при изменении
 document.addEventListener('change', async (e) => {
   const target = e.target as HTMLElement;
   if (target && target.classList.contains('boxes-input')) {
@@ -205,7 +205,7 @@ document.addEventListener('change', async (e) => {
   }
 });
 
-// 3. Обработчик кликов по кнопкам (удаление и перевод в готовые)
+// 3. Обработчик кликов (удаление и перевод в готовые)
 document.addEventListener('click', async (e) => {
   const target = e.target as HTMLElement;
   
@@ -234,7 +234,7 @@ document.addEventListener('click', async (e) => {
   }
 });
 
-// 4. Обработчик отправки формы добавления нового товара
+// 4. Обработчик формы добавления нового товара (код и название уходят в таблицу вниз)
 const addItemForm = document.getElementById('add-item-form') as HTMLFormElement;
 if (addItemForm) {
   addItemForm.addEventListener('submit', async (e) => {
