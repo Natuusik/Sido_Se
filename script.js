@@ -8,7 +8,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-const SUPABASE_URL = 'https://vuppdvlpbyzhcmalhoi.supabase.co';
+const SUPABASE_URL = 'https://vuppdvlpsbyzhcmalhoi.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_frIjzGAOaW77jegazxN-_Q_OUqN-hzO';
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const TABLE_NAME = 'sidose_tasks'; // Должно точно совпадать с названием в Supabase!

@@ -1,7 +1,7 @@
 // Объявляем глобальный объект supabase, загруженный из CDN в HTML
 declare const supabase: any;
 
-const SUPABASE_URL = 'https://vuppdvlpbyzhcmalhoi.supabase.co';
+const SUPABASE_URL = 'https://vuppdvlpsbyzhcmalhoi.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_frIjzGAOaW77jegazxN-_Q_OUqN-hzO';
 
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
