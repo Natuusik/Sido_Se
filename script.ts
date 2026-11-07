@@ -401,12 +401,9 @@ const copyBtn = document.getElementById(`copy-${section.key}-table`);
     });
   });
 }
-// Инициализация при старте
-renderHeaderDate();
-renderLastUpdateTime();
-renderDashboard();
-fetchItemsFromSupabase();
-// Обработка кликов по кнопкам (Done и Delete)
+// ==========================================
+// Глобальный обработчик кликов (вешается один раз на старте)
+// ==========================================
 if (dashboardContainer) {
   dashboardContainer.addEventListener('click', async (e) => {
     const target = e.target as HTMLElement;
@@ -452,3 +449,8 @@ if (dashboardContainer) {
     }
   });
 }
+
+// Инициализация при старте
+renderHeaderDate();
+renderLastUpdateTime();
+fetchItemsFromSupabase(); // Сначала грузим данные, внутри этой функции вызывается рендеринг дашборда
