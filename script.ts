@@ -197,32 +197,34 @@ function renderDashboard(): void {
     const groupItems = items.filter(item => item.status === section.key);
     const count = groupItems.length;
     
-    // Считаем общую сумму по секции (количество * множитель для каждого товара)
+    // Общая сумма по секции (скрываем лишний кружок, но можем оставить в памяти или убрать совсем)
     const totalSum = groupItems.reduce((acc, item: any) => {
-      const q = Number(item.quantity) || 1;
-      const m = Number(item.multiplier) ?? 100;
-      return acc + (q * m);
+      return acc + (Number(item.quantity ?? 1) * Number(item.multiplier ?? 100));
     }, 0);
     
     const sectionDiv = document.createElement('div');
     sectionDiv.id = `${section.key}-section`;
-    sectionDiv.className = `rounded-3xl p-6 md:p-8 border mb-8 ${section.bgClass}`;
+    sectionDiv.className = `rounded-3xl p-4 md:p-8 border mb-8 ${section.bgClass}`;
 
+    // Кнопки управления секцией (на мобилках занимают всю ширину или выстраиваются аккуратно)
     const actionButtonsHtml = count > 0
-      ? `<div class="flex items-center space-x-2 no-print">
+      ? `<div class="flex flex-wrap items-center gap-2 no-print">
           <button id="print-${section.key}-table" class="bg-stone-800 hover:bg-stone-900 text-white text-xs px-3.5 py-2 rounded-xl font-medium transition-colors shadow-sm flex items-center space-x-1"><span>🖨️ Print / PDF</span></button>
           <button id="copy-${section.key}-table" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3.5 py-2 rounded-xl font-medium transition-colors shadow-sm flex items-center space-x-1"><span>📋 To Word</span></button>
         </div>`
       : '';
 
+    // Шапка секции: убран круглый бейджик, название и кнопки красиво адаптируются под мобилки
     let tableContent = `
-      <div class="flex items-center justify-between mb-6">
-        <h2 class="text-xl font-bold text-stone-900 flex items-center space-x-3">
-          <span>${section.title}</span>
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+        <div class="flex items-center space-x-3">
+          <h2 class="text-lg md:text-xl font-bold text-stone-900">
+            ${section.title}
+          </h2>
           <span class="text-xs px-3 py-1 rounded-full font-semibold ${section.badgeClass}">
-            ${count} items (Total: ${totalSum})
+            ${count} items
           </span>
-        </h2>
+        </div>
         ${actionButtonsHtml}
       </div>
     `;
@@ -235,7 +237,7 @@ function renderDashboard(): void {
       groupItems.forEach((item: any, index) => {
         let actionButton = '';
         if (section.key === 'process') {
-          actionButton = `<button class="move-to-ready-btn bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-xl text-xs font-semibold transition-colors shadow-sm flex items-center space-x-1" data-id="${item.id}"><span>✅ Done</span></button>`;
+          actionButton = `<button class="move-to-ready-btn bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-xl text-xs font-semibold transition-colors shadow-sm flex items-center space-x-1" data-id="${item.id}"><span>✅ Done</span></button>`;
         } else {
           actionButton = `<span class="text-xs text-emerald-700 font-semibold bg-emerald-100 px-3 py-2 rounded-xl">Finished</span>`;
         }
@@ -257,31 +259,40 @@ function renderDashboard(): void {
         const currentMultiplier = item.multiplier ?? 100;
         const rowTotal = currentQty * currentMultiplier;
 
+        // Карточка товара с адаптивной сеткой для мобилок (чтобы инпуты и калькулятор не вылезали)
         tableContent += `
-          <div draggable="true" data-id="${item.id}" class="draggable-row flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-white rounded-2xl border border-stone-200/80 border-l-4 ${borderAccentClass} shadow-sm transition-all hover:shadow-md cursor-grab active:cursor-grabbing gap-4">
-            <div class="flex items-center space-x-3 w-full sm:w-auto">
-              <span class="text-stone-300 hover:text-stone-500 cursor-grab select-none text-base" title="Drag to reorder">⠿</span>
+          <div draggable="true" data-id="${item.id}" class="draggable-row flex flex-col xl:flex-row items-start xl:items-center justify-between p-4 bg-white rounded-2xl border border-stone-200/80 border-l-4 ${borderAccentClass} shadow-sm transition-all hover:shadow-md gap-4">
+            
+            <!-- Левая часть: перетаскивание, номер, код и название -->
+            <div class="flex items-center space-x-3 w-full xl:w-auto">
+              <span class="text-stone-300 hover:text-stone-500 cursor-grab select-none text-base hidden sm:inline" title="Drag to reorder">⠿</span>
               <span class="text-stone-400 font-bold text-xs w-6 text-center bg-stone-100 py-1 rounded-lg">${index + 1}</span>
-              <a href="${item.pdfUrl}" target="_blank" title="Open PDF" class="group flex items-center space-x-2 bg-stone-50 hover:bg-blue-50 px-3 py-1.5 rounded-xl border border-stone-200 transition-colors">
+              <a href="${item.pdfUrl}" target="_blank" title="Open PDF" class="group flex items-center space-x-1.5 bg-stone-50 hover:bg-blue-50 px-3 py-1.5 rounded-xl border border-stone-200 transition-colors shrink-0">
                 <span class="font-mono font-bold text-blue-600 text-sm">${item.code}</span>
-                <span class="text-xs text-stone-400 group-hover:text-blue-600">📄 PDF</span>
+                <span class="text-xs text-stone-400 group-hover:text-blue-600">📄</span>
               </a>
-              <div class="font-medium text-stone-800 text-sm md:text-base flex-1 sm:flex-none">
+              <div class="font-medium text-stone-800 text-sm md:text-base leading-snug">
                 ${formatTitle(item.title)}
               </div>
             </div>
-            <div class="flex items-center space-x-3 w-full sm:w-auto justify-end">
-              <!-- Интерактивные поля ввода: Количество и Множитель -->
+
+            <!-- Правая часть: калькулятор (quantity x multiplier) и кнопки действий -->
+            <div class="flex flex-wrap items-center justify-between xl:justify-end gap-3 w-full xl:w-auto pt-3 xl:pt-0 border-t xl:border-t-0 border-stone-100">
+              
+              <!-- Поля ввода с расчетом -->
               <div class="flex items-center space-x-1.5 bg-stone-50 px-3 py-1.5 rounded-xl border border-stone-200">
                 <input type="number" min="1" value="${currentQty}" data-id="${item.id}" data-field="quantity" class="item-calc-input w-12 text-center bg-white border border-stone-300 rounded-lg text-xs py-1 focus:outline-none focus:border-blue-500 font-mono font-bold" />
-                <span class="text-xs font-semibold text-stone-600">×</span>
+                <span class="text-xs font-semibold text-stone-500">×</span>
                 <input type="number" value="${currentMultiplier}" data-id="${item.id}" data-field="multiplier" class="item-calc-input w-14 text-center bg-white border border-stone-300 rounded-lg text-xs py-1 focus:outline-none focus:border-blue-500 font-mono font-bold" />
                 <span class="text-xs font-semibold text-stone-600">= <span class="text-blue-600 font-bold">${rowTotal}</span></span>
               </div>
-              <div class="flex items-center space-x-2 no-print pt-2 sm:pt-0 border-t sm:border-t-0 border-stone-100">
+
+              <!-- Кнопки действий (Готово / Удалить) -->
+              <div class="flex items-center space-x-2 no-print">
                 ${actionButton}
                 <button class="delete-btn bg-stone-50 hover:bg-rose-50 text-stone-400 hover:text-rose-600 border border-stone-200 p-2 rounded-xl text-xs transition-colors shadow-xs" data-id="${item.id}" title="Delete item">🗑️</button>
               </div>
+
             </div>
           </div>
         `;
