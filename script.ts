@@ -200,20 +200,31 @@ const actionButtonsHtml = groupItems.length > 0
           borderAccentClass = 'border-l-purple-500 hover:bg-purple-50/50';
         }
 
-        tableContent += `
-          <div draggable="true" data-id="${item.id}" class="draggable-row flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-white rounded-2xl border border-stone-200/80 border-l-4 ${borderAccentClass} shadow-sm transition-all hover:shadow-md cursor-grab active:cursor-grabbing gap-4">
-            <div class="flex items-center space-x-3 w-full sm:w-auto">
-              <span class="text-stone-300 hover:text-stone-500 cursor-grab select-none text-base" title="Drag to reorder">⠿</span>
-              <span class="text-stone-400 font-bold text-xs w-6 text-center bg-stone-100 py-1 rounded-lg">${index + 1}</span>
-              <a href="${item.pdfUrl}" target="_blank" title="Open PDF" class="group flex items-center space-x-2 bg-stone-50 hover:bg-blue-50 px-3 py-1.5 rounded-xl border border-stone-200 transition-colors">
-                <span class="font-mono font-bold text-blue-600 text-sm">${item.code}</span>
-                <span class="text-xs text-stone-400 group-hover:text-blue-600">📄 PDF</span>
-              </a>
-              <div class="font-medium text-stone-800 text-sm md:text-base flex-1 sm:flex-none">
+   tableContent += `
+          <div draggable="true" data-id="${item.id}" class="draggable-row flex flex-col md:flex-row items-start md:items-center justify-between p-4 bg-white rounded-2xl border border-stone-200/80 border-l-4 ${borderAccentClass} shadow-sm transition-all hover:shadow-md cursor-grab active:cursor-grabbing gap-4">
+            
+            <!-- Левая часть: переведена в колонку на мобильных, чтобы название было строго под кодом -->
+            <div class="flex flex-col md:flex-row md:items-center gap-3 w-full md:w-auto">
+              
+              <!-- Верхняя мини-строка для мобильных: иконка перетаскивания, номер и PDF-код -->
+              <div class="flex items-center space-x-3">
+                <span class="text-stone-300 hover:text-stone-500 cursor-grab select-none text-base" title="Drag to reorder">⠿</span>
+                <span class="text-stone-400 font-bold text-xs w-6 text-center bg-stone-100 py-1 rounded-lg">${index + 1}</span>
+                <a href="${item.pdfUrl}" target="_blank" title="Open PDF" class="group flex items-center space-x-2 bg-stone-50 hover:bg-blue-50 px-3 py-1.5 rounded-xl border border-stone-200 transition-colors">
+                  <span class="font-mono font-bold text-blue-600 text-sm">${item.code}</span>
+                  <span class="text-xs text-stone-400 group-hover:text-blue-600">📄 PDF</span>
+                </a>
+              </div>
+
+              <!-- Название задачи: теперь на мобильных оно идет отдельной строкой снизу и не сжимается -->
+              <div class="font-medium text-stone-800 text-sm md:text-base w-full md:w-auto pl-0 md:pl-2">
                 ${formatTitle(item.title)}
               </div>
+
             </div>
-            <div class="flex items-center justify-end space-x-2 w-full sm:w-auto no-print pt-2 sm:pt-0 border-t sm:border-t-0 border-stone-100">
+
+            <!-- Правая часть с кнопками действий -->
+            <div class="flex items-center justify-end space-x-2 w-full md:w-auto no-print pt-2 md:pt-0 border-t md:border-t-0 border-stone-100">
               ${actionButton}
               <button class="delete-btn bg-stone-50 hover:bg-rose-50 text-stone-400 hover:text-rose-600 border border-stone-200 p-2 rounded-xl text-xs transition-colors shadow-xs" data-id="${item.id}" title="Delete item">🗑️</button>
             </div>
