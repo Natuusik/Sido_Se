@@ -223,8 +223,8 @@ if (addItemForm) {
         e.preventDefault();
         const codeInput = document.getElementById('product-code');
         const titleInput = document.getElementById('product-title');
-        const code = codeInput.value.trim();
-        const title = titleInput.value.trim();
+        const code = codeInput ? codeInput.value.trim() : '';
+        const title = titleInput ? titleInput.value.trim() : '';
         if (!code || !title)
             return;
         const newItem = {
@@ -241,8 +241,10 @@ if (addItemForm) {
             alert('Ошибка сохранения в Supabase: ' + error.message);
         }
         else {
-            codeInput.value = '';
-            titleInput.value = '';
+            if (codeInput)
+                codeInput.value = '';
+            if (titleInput)
+                titleInput.value = '';
             lastUpdateTime = new Date();
             renderLastUpdateTime();
             yield fetchItemsFromSupabase();

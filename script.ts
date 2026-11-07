@@ -8,6 +8,7 @@ const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const TABLE_NAME = 'sidose_tasks'; // Должно точно совпадать с названием в Supabase!
 
 
+
 let items: any[] = [];
 let lastUpdateTime = new Date();
 
@@ -243,8 +244,8 @@ if (addItemForm) {
     const codeInput = document.getElementById('product-code') as HTMLInputElement;
     const titleInput = document.getElementById('product-title') as HTMLInputElement;
 
-    const code = codeInput.value.trim();
-    const title = titleInput.value.trim();
+    const code = codeInput ? codeInput.value.trim() : '';
+    const title = titleInput ? titleInput.value.trim() : '';
 
     if (!code || !title) return;
 
@@ -262,8 +263,8 @@ if (addItemForm) {
       console.error('Error inserting item:', error.message);
       alert('Ошибка сохранения в Supabase: ' + error.message);
     } else {
-      codeInput.value = '';
-      titleInput.value = '';
+      if (codeInput) codeInput.value = '';
+      if (titleInput) titleInput.value = '';
       lastUpdateTime = new Date();
       renderLastUpdateTime();
       await fetchItemsFromSupabase();
