@@ -489,30 +489,31 @@ if (dashboardContainer) {
     }
   });
 }
-
-
-// Прямая функция для перевода в статус ready
-// Принудительно вешаем функцию в глобальный объект window, чтобы HTML её видел
+// Глобальная функция для кнопки "Done"
+// Очищаем и объявляем глобальную функцию правильно один раз:
 (window as any).markAsReady = async function(itemId: number) {
   try {
     const { error } = await supabaseClient
-      .from(TABLE_NAME)
+      .from(TABLE_NAME) // Используем вашу переменную таблицы
       .update({ status: 'ready' })
       .eq('id', itemId);
 
     if (error) {
-      console.error('Error updating status:', error);
-      alert('Ошибка при обновлении статуса: ' + error.message);
+      console.error('Ошибка Supabase:', error);
+      alert('Не удалось обновить статус: ' + error.message);
     } else {
       lastUpdateTime = new Date();
       renderLastUpdateTime();
       await fetchItemsFromSupabase();
     }
   } catch (err) {
-    console.error('Exception in markAsReady:', err);
+    console.error('Ошибка в markAsReady:', err);
   }
 };
+
+
 // Инициализация при старте
 renderHeaderDate();
 renderLastUpdateTime();
 fetchItemsFromSupabase();
+
