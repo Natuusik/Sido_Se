@@ -144,14 +144,14 @@ function renderDashboard() {
         sectionDiv.id = `${section.key}-section`;
         sectionDiv.className = `rounded-3xl p-6 md:p-8 border mb-8 ${section.bgClass}`;
         const actionButtonsHtml = groupItems.length > 0
-            ? `<div class="flex items-center space-x-2 no-print">
-          <button id="print-${section.key}-table" class="bg-stone-800 hover:bg-stone-900 text-white text-xs px-3.5 py-2 rounded-xl font-medium transition-colors shadow-sm flex items-center space-x-1"><span>🖨️ Print / PDF</span></button>
-          <button id="copy-${section.key}-table" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3.5 py-2 rounded-xl font-medium transition-colors shadow-sm flex items-center space-x-1"><span>📋 To Word</span></button>
-        </div>`
+            ? `<div class="flex items-center gap-2 no-print w-full sm:w-auto">
+          <button id="print-${section.key}-table" class="flex-1 sm:flex-none bg-stone-800 hover:bg-stone-900 text-white text-xs px-3.5 py-2.5 rounded-xl font-medium transition-colors shadow-sm flex items-center justify-center gap-1.5"><span>🖨️ Print / PDF</span></button>
+          <button id="copy-${section.key}-table" class="flex-1 sm:flex-none bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3.5 py-2.5 rounded-xl font-medium transition-colors shadow-sm flex items-center justify-center gap-1.5"><span>📋 To Word</span></button>
+         </div>`
             : '';
         let tableContent = `
-      <div class="flex items-center justify-between mb-6">
-        <h2 class="text-xl font-bold text-stone-900 flex items-center space-x-3">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <h2 class="text-lg md:text-xl font-bold text-stone-900 flex items-center flex-wrap gap-2">
           <span>${section.title}</span>
           <span class="text-xs px-3 py-1 rounded-full font-semibold ${section.badgeClass}">${groupItems.length} items</span>
         </h2>
