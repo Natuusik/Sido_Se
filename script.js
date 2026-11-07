@@ -267,6 +267,73 @@ function renderDashboard() {
         sectionDiv.innerHTML = tableContent;
         dashboardContainer.appendChild(sectionDiv);
     });
+    // Привязка обработчиков для кнопок печати и копирования (Word) по секциям
+    targetSections.forEach(section => {
+        const printBtn = document.getElementById(`print-${section.key}-table`);
+        if (printBtn) {
+            printBtn.addEventListener('click', () => {
+                // Логика печати секции (или вызов вашей функции печати)
+                window.print();
+            });
+        }
+        const copyBtn = document.getElementById(`copy-${section.key}-table`);
+        if (copyBtn) {
+            copyBtn.addEventListener('click', () => {
+                // Собираем все элементы этой секции
+                const groupItems = items.filter(item => item.status === section.key);
+                if (groupItems.length === 0) {
+                    alert('В этой секции нет данных для копирования.');
+                    return;
+                }
+                // Формируем HTML-таблицу для идеальной вставки в Word (без строки ИТОГО)
+                let htmlTable = `
+          <table border="1" cellspacing="0" cellpadding="5" style="border-collapse: collapse; font-family: Arial, sans-serif; font-size: 14px; width: 100%;">
+            <thead>
+              <tr style="background-color: #f3f4f6; text-align: left;">
+                <th style="padding: 8px; border: 1px solid #d1d5db;">№</th>
+                <th style="padding: 8px; border: 1px solid #d1d5db;">Код</th>
+                <th style="padding: 8px; border: 1px solid #d1d5db;">Название товара</th>
+                <th style="padding: 8px; border: 1px solid #d1d5db; text-align: center;">Количество</th>
+                <th style="padding: 8px; border: 1px solid #d1d5db; text-align: center;">Множитель</th>
+                <th style="padding: 8px; border: 1px solid #d1d5db; text-align: right;">Итого</th>
+              </tr>
+            </thead>
+            <tbody>
+        `;
+                groupItems.forEach((item, index) => {
+                    var _a, _b;
+                    const qty = (_a = item.quantity) !== null && _a !== void 0 ? _a : 1;
+                    const mult = (_b = item.multiplier) !== null && _b !== void 0 ? _b : 100;
+                    const total = qty * mult;
+                    htmlTable += `
+            <tr>
+              <td style="padding: 8px; border: 1px solid #d1d5db; text-align: center;">${index + 1}</td>
+              <td style="padding: 8px; border: 1px solid #d1d5db; font-family: monospace; font-weight: bold;">${item.code}</td>
+              <td style="padding: 8px; border: 1px solid #d1d5db;">${item.title}</td>
+              <td style="padding: 8px; border: 1px solid #d1d5db; text-align: center;">${qty}</td>
+              <td style="padding: 8px; border: 1px solid #d1d5db; text-align: center;">${mult}</td>
+              <td style="padding: 8px; border: 1px solid #d1d5db; text-align: right; font-weight: bold;">${total}</td>
+            </tr>
+          `;
+                });
+                htmlTable += `
+            </tbody>
+          </table>
+        `;
+                // Копируем таблицу в буфер обмена для Word
+                const clipboardItem = new ClipboardItem({
+                    "text/html": new Blob([htmlTable], { type: "text/html" }),
+                    "text/plain": new Blob([htmlTable.replace(/<[^>]*>?/gm, '')], { type: "text/plain" })
+                });
+                navigator.clipboard.write([clipboardItem]).then(() => {
+                    alert(`Таблица секции "${section.title}" успешно скопирована! Теперь вставьте ее в Word (Ctrl + V).`);
+                }).catch(err => {
+                    console.error('Ошибка при копировании:', err);
+                    alert('Не удалось скопировать таблицу.');
+                });
+            });
+        }
+    });
     // Привязка событий для обоих полей (quantity и multiplier)
     document.querySelectorAll('.item-calc-input').forEach(input => {
         input.addEventListener('change', (e) => __awaiter(this, void 0, void 0, function* () {
@@ -279,7 +346,7 @@ function renderDashboard() {
             if (targetItem && field) {
                 targetItem[field] = val;
             }
-            // Сохраняем в Supabase (убедитесь, что колонки quantity и multiplier созданы в таблице)
+            // Сохраняем в Supabase
             try {
                 const updateObj = {};
                 updateObj[field] = val;
