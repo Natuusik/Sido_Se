@@ -15,7 +15,9 @@ interface CatalogItem {
 
 interface ProductionItem extends CatalogItem {
   id: number;
-  status: 'ready' | 'process' | 'boxes'; // <--- ОБЯЗАТЕЛЬНО должны быть перечислены все три через вертикальную черту
+  status: 'ready' | 'process' | 'boxes';
+  quantity?: number;
+  multiplier?: number;
 }
 
 const catalogDatabase: CatalogItem[] = [
@@ -82,7 +84,6 @@ async function fetchItemsFromSupabase() {
   }
 }
 
-
 function renderDashboard(): void {
   if (!dashboardContainer) return;
 
@@ -119,7 +120,7 @@ function renderDashboard(): void {
   
   dashboardContainer.appendChild(addFormContainer);
 
-  // Автосвязка полей Кода и Названия
+  // 2. Автосвязка полей Кода и Названия
   const codeInput = document.getElementById('product-code') as HTMLInputElement;
   const titleInput = document.getElementById('product-title') as HTMLInputElement;
 
@@ -159,8 +160,8 @@ function renderDashboard(): void {
         title: title,
         status: 'process' as const,
         pdfUrl: `./docs/${code}.pdf`,
-        quantity: 1,  // Значение по умолчанию для количества
-        multiplier: 100 // Значение по умолчанию для множителя
+        quantity: 1,
+        multiplier: 100
       };
 
       const { error } = await supabaseClient.from(TABLE_NAME).insert([newItem]);
@@ -177,7 +178,7 @@ function renderDashboard(): void {
     });
   }
 
-  // 2. Только две секции (Completed Goods и In Progress)
+  // 3. Только две секции (Completed Goods и In Progress)
   const targetSections = [
     { 
       key: 'ready', 
@@ -209,7 +210,6 @@ function renderDashboard(): void {
         </div>`
       : '';
 
-    // Шапка: только количество элементов, без Total
     let tableContent = `
       <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div class="flex items-center space-x-3">
@@ -254,7 +254,7 @@ function renderDashboard(): void {
         const currentMultiplier = item.multiplier ?? 100;
         const rowTotal = currentQty * currentMultiplier;
 
-        // Карточка товара: на мобилках вертикально, на ПК (xl) в одну строчку
+        // 4. Карточка товара: на мобилках вертикально, на ПК (xl) в одну строчку
         tableContent += `
           <div draggable="true" data-id="${item.id}" class="draggable-row flex flex-col xl:flex-row items-start xl:items-center justify-between p-4 bg-white rounded-2xl border border-stone-200/80 border-l-4 ${borderAccentClass} shadow-sm transition-all hover:shadow-md gap-4">
             
@@ -299,19 +299,19 @@ function renderDashboard(): void {
     sectionDiv.innerHTML = tableContent;
     dashboardContainer.appendChild(sectionDiv);
   });
-// Привязка обработчиков для кнопок печати и копирования (Word) по секциям
+
+  // Привязка обработчиков для кнопок печати и копирования (Word) по секциям
   targetSections.forEach(section => {
     const printBtn = document.getElementById(`print-${section.key}-table`);
     if (printBtn) {
       printBtn.addEventListener('click', () => {
-        // Логика печати секции (или вызов вашей функции печати)
         window.print();
       });
     }
-const copyBtn = document.getElementById(`copy-${section.key}-table`);
+
+    const copyBtn = document.getElementById(`copy-${section.key}-table`);
     if (copyBtn) {
       copyBtn.addEventListener('click', () => {
-        // Собираем все элементы этой секции
         const groupItems = items.filter(item => item.status === section.key);
         
         if (groupItems.length === 0) {
@@ -319,7 +319,7 @@ const copyBtn = document.getElementById(`copy-${section.key}-table`);
           return;
         }
 
-        // Формируем HTML-таблицу для идеальной вставки в Word (без строки ИТОГО)
+        // 5. Формируем HTML-таблицу для идеальной вставки в Word (без строки ИТОГО)
         let htmlTable = `
           <table border="1" cellspacing="0" cellpadding="5" style="border-collapse: collapse; font-family: Arial, sans-serif; font-size: 14px; width: 100%;">
             <thead>
@@ -357,7 +357,6 @@ const copyBtn = document.getElementById(`copy-${section.key}-table`);
           </table>
         `;
 
-        // Копируем таблицу в буфер обмена для Word
         const clipboardItem = new ClipboardItem({
           "text/html": new Blob([htmlTable], { type: "text/html" }),
           "text/plain": new Blob([htmlTable.replace(/<[^>]*>?/gm, '')], { type: "text/plain" })
@@ -378,16 +377,14 @@ const copyBtn = document.getElementById(`copy-${section.key}-table`);
     input.addEventListener('change', async (e) => {
       const target = e.target as HTMLInputElement;
       const id = Number(target.getAttribute('data-id'));
-      const field = target.getAttribute('data-field'); // 'quantity' или 'multiplier'
+      const field = target.getAttribute('data-field');
       const val = Number(target.value) || 0;
 
-      // Обновляем локально в массиве
       const targetItem: any = items.find(i => i.id === id);
       if (targetItem && field) {
         targetItem[field] = val;
       }
 
-      // Сохраняем в Supabase
       try {
         const updateObj: any = {};
         updateObj[field!] = val;
@@ -396,13 +393,13 @@ const copyBtn = document.getElementById(`copy-${section.key}-table`);
         console.error('Error updating in Supabase:', err);
       }
 
-      // Перерисовываем дашборд для обновления расчетов
       renderDashboard();
     });
   });
 }
+
 // ==========================================
-// Глобальный обработчик кликов (вешается один раз на старте)
+// 6. Глобальный обработчик кликов (вешается один раз на старте)
 // ==========================================
 if (dashboardContainer) {
   dashboardContainer.addEventListener('click', async (e) => {
@@ -453,4 +450,4 @@ if (dashboardContainer) {
 // Инициализация при старте
 renderHeaderDate();
 renderLastUpdateTime();
-fetchItemsFromSupabase(); // Сначала грузим данные, внутри этой функции вызывается рендеринг дашборда
+fetchItemsFromSupabase();
