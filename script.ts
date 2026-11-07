@@ -232,11 +232,8 @@ function renderDashboard(): void {
       groupItems.forEach((item: any, index) => {
         let actionButton = '';
         if (section.key === 'process') {
-          actionButton = `<button class="move-to-ready-btn bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-xl text-xs font-semibold transition-colors shadow-sm shrink-0" data-id="${item.id}">✅ Done</button>`;
-        } else {
-          actionButton = `<span class="text-xs text-emerald-700 font-semibold bg-emerald-100 px-3 py-2 rounded-xl shrink-0">Finished</span>`;
-        }
-
+  actionButton = `<button onclick="markAsReady(${item.id})" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-xl text-xs font-semibold transition-colors shadow-sm shrink-0">✅ Done</button>`;
+}
         const text = `${item.title} ${item.code}`.toUpperCase();
         let borderAccentClass = 'border-l-stone-300';
         
@@ -299,6 +296,52 @@ function renderDashboard(): void {
     sectionDiv.innerHTML = tableContent;
     dashboardContainer.appendChild(sectionDiv);
   });
+  // --- НАДЕЖНЫЙ ПРИВЯЗАТЕЛЬ СОБЫТИЙ ВНУТРИ РЕНДЕРИНГА ---
+  const currentContainer = document.getElementById('dashboard-container');
+  if (currentContainer) {
+    // Удаляем старый клонированный обработчик через замену узла или просто вешаем свежий на текущий HTML
+    // Самый простой способ без утечек — вешать прямо на кнопки внутри контейнера:
+    
+    currentContainer.querySelectorAll('.move-to-ready-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const id = Number(btn.getAttribute('data-id'));
+        if (!id) return;
+        
+        const { error } = await supabaseClient
+          .from(TABLE_NAME)
+          .update({ status: 'ready' })
+          .eq('id', id);
+
+        if (error) {
+          console.error('Error updating status:', error);
+        } else {
+          lastUpdateTime = new Date();
+          renderLastUpdateTime();
+          await fetchItemsFromSupabase();
+        }
+      });
+    });
+
+    currentContainer.querySelectorAll('.delete-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const id = Number(btn.getAttribute('data-id'));
+        if (!id) return;
+        
+        const { error } = await supabaseClient
+          .from(TABLE_NAME)
+          .delete()
+          .eq('id', id);
+
+        if (error) {
+          console.error('Error deleting item:', error);
+        } else {
+          lastUpdateTime = new Date();
+          renderLastUpdateTime();
+          await fetchItemsFromSupabase();
+        }
+      });
+    });
+  }
 
   // Привязка обработчиков для кнопок печати и копирования (Word) по секциям
   targetSections.forEach(section => {
@@ -445,6 +488,29 @@ if (dashboardContainer) {
       }
     }
   });
+}
+
+
+// Прямая функция для перевода в статус ready
+// Глобальная функция для перевода в статус ready (чтобы onclick её видел)
+async function markAsReady(itemId: number) {
+  try {
+    const { error } = await supabaseClient
+      .from(TABLE_NAME)
+      .update({ status: 'ready' })
+      .eq('id', itemId);
+
+    if (error) {
+      console.error('Error updating status:', error);
+      alert('Ошибка при обновлении статуса: ' + error.message);
+    } else {
+      lastUpdateTime = new Date();
+      renderLastUpdateTime();
+      await fetchItemsFromSupabase();
+    }
+  } catch (err) {
+    console.error('Exception in markAsReady:', err);
+  }
 }
 
 // Инициализация при старте
