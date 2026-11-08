@@ -80,6 +80,9 @@ function formatTitle(title: string): string {
 // ==========================================
 // 3. Работа с Supabase (Загрузка задач + Общее время)
 // ==========================================
+// ==========================================
+// Загрузка данных и времени из Supabase
+// ==========================================
 async function fetchItemsFromSupabase(): Promise<void> {
   try {
     // 1. Загружаем задачи
@@ -90,7 +93,7 @@ async function fetchItemsFromSupabase(): Promise<void> {
       items = taskData as ProductionItem[];
     }
 
-    // 2. Загружаем время последнего обновления из облачной базы
+    // 2. ВСЕГДА подгружаем последнее время из базы app_settings для всех устройств
     const { data: timeData, error: timeError } = await supabaseClient
       .from('app_settings')
       .select('last_update_time')
@@ -99,16 +102,17 @@ async function fetchItemsFromSupabase(): Promise<void> {
 
     if (!timeError && timeData && timeData.last_update_time) {
       lastUpdateTime = new Date(timeData.last_update_time);
+    } else {
+      lastUpdateTime = null;
     }
 
   } catch (err) {
     console.error('Fetch exception:', err);
   } finally {
     renderDashboard();
-    renderLastUpdateTime();
+    renderLastUpdateTime(); // Сразу рисуем то время, которое пришло из базы!
   }
 }
-
 // Глобальная функция для кнопки "Done"
 (window as any).markAsReady = async function(itemId: number) {
   try {

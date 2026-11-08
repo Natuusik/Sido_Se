@@ -62,6 +62,9 @@ function formatTitle(title) {
 // ==========================================
 // 3. Работа с Supabase (Загрузка задач + Общее время)
 // ==========================================
+// ==========================================
+// Загрузка данных и времени из Supabase
+// ==========================================
 function fetchItemsFromSupabase() {
     return __awaiter(this, void 0, void 0, function* () {
         try {
@@ -73,7 +76,7 @@ function fetchItemsFromSupabase() {
             else if (taskData) {
                 items = taskData;
             }
-            // 2. Загружаем время последнего обновления из облачной базы
+            // 2. ВСЕГДА подгружаем последнее время из базы app_settings для всех устройств
             const { data: timeData, error: timeError } = yield supabaseClient
                 .from('app_settings')
                 .select('last_update_time')
@@ -82,13 +85,16 @@ function fetchItemsFromSupabase() {
             if (!timeError && timeData && timeData.last_update_time) {
                 lastUpdateTime = new Date(timeData.last_update_time);
             }
+            else {
+                lastUpdateTime = null;
+            }
         }
         catch (err) {
             console.error('Fetch exception:', err);
         }
         finally {
             renderDashboard();
-            renderLastUpdateTime();
+            renderLastUpdateTime(); // Сразу рисуем то время, которое пришло из базы!
         }
     });
 }
