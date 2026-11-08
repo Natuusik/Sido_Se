@@ -401,19 +401,15 @@ function renderDashboard() {
         }));
     });
 }
-// ==========================================
-// 5. Логика кнопки "Refresh" (Сохранение в базу для всех!)
-// ==========================================
+// Обновленный обработчик клика по кнопке Refresh
 function handleRefreshClick() {
     return __awaiter(this, void 0, void 0, function* () {
-        const refreshBtn = document.getElementById('refresh-btn');
-        if (refreshBtn) {
-            refreshBtn.disabled = true;
-            refreshBtn.style.opacity = '0.6';
-        }
         const now = new Date();
+        // Сразу показываем время на экране, чтобы оно не пропадало
+        lastUpdateTime = now;
+        renderLastUpdateTime();
         try {
-            // Сохраняем текущее время в таблицу app_settings (id = 1)
+            // Сохраняем свежее время в таблицу app_settings в Supabase
             const { error } = yield supabaseClient
                 .from('app_settings')
                 .update({ last_update_time: now.toISOString() })
@@ -421,25 +417,20 @@ function handleRefreshClick() {
             if (error) {
                 console.error('Ошибка сохранения времени в базу:', error);
             }
-            else {
-                lastUpdateTime = now;
-                renderLastUpdateTime(); // Перерисовываем интерфейс на экране
+            // Загружаем обратно только задачи (не трогая время, чтобы оно не сбросилось)
+            const { data: taskData, error: taskError } = yield supabaseClient.from(TABLE_NAME).select('*');
+            if (taskError) {
+                console.error('Ошибка загрузки задач:', taskError.message);
+            }
+            else if (taskData) {
+                items = taskData;
+                renderDashboard();
             }
         }
         catch (err) {
-            console.error('Ошибка рефреша:', err);
-        }
-        // Подгружаем актуальные данные задач
-        yield fetchItemsFromSupabase();
-        if (refreshBtn) {
-            refreshBtn.disabled = false;
-            refreshBtn.style.opacity = '1';
+            console.error('Ошибка при обновлении:', err);
         }
     });
-}
-const refreshButton = document.getElementById('refresh-btn');
-if (refreshButton) {
-    refreshButton.addEventListener('click', handleRefreshClick);
 }
 // ==========================================
 // 6. Запуск при старте страницы

@@ -439,48 +439,38 @@ function renderDashboard(): void {
   });
 }
 
-// ==========================================
-// 5. Логика кнопки "Refresh" (Сохранение в базу для всех!)
-// ==========================================
+// Обновленный обработчик клика по кнопке Refresh
 async function handleRefreshClick(): Promise<void> {
-  const refreshBtn = document.getElementById('refresh-btn') as HTMLButtonElement | null;
-  if (refreshBtn) {
-    refreshBtn.disabled = true;
-    refreshBtn.style.opacity = '0.6';
-  }
+  const now = new Date();
+  
+  // Сразу показываем время на экране, чтобы оно не пропадало
+  lastUpdateTime = now;
+  renderLastUpdateTime();
 
-const now = new Date();
+  try {
+    // Сохраняем свежее время в таблицу app_settings в Supabase
+    const { error } = await supabaseClient
+      .from('app_settings')
+      .update({ last_update_time: now.toISOString() })
+      .eq('id', 1);
 
-try {
-  // Сохраняем текущее время в таблицу app_settings (id = 1)
-  const { error } = await supabaseClient
-    .from('app_settings')
-    .update({ last_update_time: now.toISOString() })
-    .eq('id', 1);
+    if (error) {
+      console.error('Ошибка сохранения времени в базу:', error);
+    }
 
-  if (error) {
-    console.error('Ошибка сохранения времени в базу:', error);
-  } else {
-    lastUpdateTime = now;
-    renderLastUpdateTime(); // Перерисовываем интерфейс на экране
-  }
-} catch (err) {
-  console.error('Ошибка рефреша:', err);
-}
-  // Подгружаем актуальные данные задач
-  await fetchItemsFromSupabase();
+    // Загружаем обратно только задачи (не трогая время, чтобы оно не сбросилось)
+    const { data: taskData, error: taskError } = await supabaseClient.from(TABLE_NAME).select('*');
+    if (taskError) {
+      console.error('Ошибка загрузки задач:', taskError.message);
+    } else if (taskData) {
+      items = taskData;
+      renderDashboard();
+    }
 
-  if (refreshBtn) {
-    refreshBtn.disabled = false;
-    refreshBtn.style.opacity = '1';
+  } catch (err) {
+    console.error('Ошибка при обновлении:', err);
   }
 }
-
-const refreshButton = document.getElementById('refresh-btn');
-if (refreshButton) {
-  refreshButton.addEventListener('click', handleRefreshClick);
-}
-
 // ==========================================
 // 6. Запуск при старте страницы
 // ==========================================
