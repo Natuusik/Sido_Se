@@ -94,17 +94,18 @@ async function fetchItemsFromSupabase(): Promise<void> {
     }
 
     // 2. ВСЕГДА подгружаем последнее время из базы app_settings для всех устройств
-    const { data: timeData, error: timeError } = await supabaseClient
-      .from('app_settings')
-      .select('last_update_time')
-      .eq('id', 1)
-      .single();
+  // Загрузка времени последнего обновления из таблицы app_settings
+const { data: timeData, error: timeError } = await supabaseClient
+  .from('app_settings')
+  .select('last_update_time')
+  .eq('id', 1)
+  .single();
 
-    if (!timeError && timeData && timeData.last_update_time) {
-      lastUpdateTime = new Date(timeData.last_update_time);
-    } else {
-      lastUpdateTime = null;
-    }
+if (!timeError && timeData && timeData.last_update_time) {
+  lastUpdateTime = new Date(timeData.last_update_time);
+} else {
+  lastUpdateTime = null;
+}
 
   } catch (err) {
     console.error('Fetch exception:', err);
@@ -448,25 +449,24 @@ async function handleRefreshClick(): Promise<void> {
     refreshBtn.style.opacity = '0.6';
   }
 
-  const now = new Date();
+const now = new Date();
 
-  try {
-    // Сохраняем время прямо в таблицу Supabase, чтобы его видели все устройства
-    const { error } = await supabaseClient
-      .from('app_settings')
-      .update({ last_update_time: now.toISOString() })
-      .eq('id', 1);
+try {
+  // Сохраняем текущее время в таблицу app_settings (id = 1)
+  const { error } = await supabaseClient
+    .from('app_settings')
+    .update({ last_update_time: now.toISOString() })
+    .eq('id', 1);
 
-    if (error) {
-      console.error('Ошибка сохранения времени в базу:', error);
-    } else {
-      lastUpdateTime = now;
-      renderLastUpdateTime();
-    }
-  } catch (err) {
-    console.error('Ошибка рефреша:', err);
+  if (error) {
+    console.error('Ошибка сохранения времени в базу:', error);
+  } else {
+    lastUpdateTime = now;
+    renderLastUpdateTime(); // Перерисовываем интерфейс на экране
   }
-
+} catch (err) {
+  console.error('Ошибка рефреша:', err);
+}
   // Подгружаем актуальные данные задач
   await fetchItemsFromSupabase();
 

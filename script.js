@@ -77,6 +77,7 @@ function fetchItemsFromSupabase() {
                 items = taskData;
             }
             // 2. ВСЕГДА подгружаем последнее время из базы app_settings для всех устройств
+            // Загрузка времени последнего обновления из таблицы app_settings
             const { data: timeData, error: timeError } = yield supabaseClient
                 .from('app_settings')
                 .select('last_update_time')
@@ -412,7 +413,7 @@ function handleRefreshClick() {
         }
         const now = new Date();
         try {
-            // Сохраняем время прямо в таблицу Supabase, чтобы его видели все устройства
+            // Сохраняем текущее время в таблицу app_settings (id = 1)
             const { error } = yield supabaseClient
                 .from('app_settings')
                 .update({ last_update_time: now.toISOString() })
@@ -422,7 +423,7 @@ function handleRefreshClick() {
             }
             else {
                 lastUpdateTime = now;
-                renderLastUpdateTime();
+                renderLastUpdateTime(); // Перерисовываем интерфейс на экране
             }
         }
         catch (err) {
