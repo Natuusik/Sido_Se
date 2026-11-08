@@ -7,7 +7,7 @@ const SUPABASE_URL = 'https://vuppdvlpsbyzhcmalhoi.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_frIjzGAOaW77jegazxN-_Q_OUqN-hzO';
 
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-const TABLE_NAME = 'sidose_tasks'; // Должно точно совпадать с названием в Supabase!
+const TABLE_NAME = 'sidose_tasks';
 
 interface CatalogItem {
   code: string;
@@ -35,7 +35,7 @@ const catalogDatabase: CatalogItem[] = [
 
 let items: ProductionItem[] = [];
 
-// Читаем сохраненное время из памяти браузера, чтобы оно не сбрасывалось при перезагрузке
+// Читаем из памяти браузера то время, которое было сохранено по кнопке в прошлый раз
 const savedTime = localStorage.getItem('lastUpdateTime');
 let lastUpdateTime: Date | null = savedTime ? new Date(savedTime) : null;
 
@@ -98,7 +98,7 @@ async function fetchItemsFromSupabase(): Promise<void> {
   }
 }
 
-// Глобальная функция для кнопки "Done"
+// Глобальная функция для кнопки "Done" (перенос в Completed Goods)
 (window as any).markAsReady = async function(itemId: number) {
   try {
     const { error } = await supabaseClient
@@ -314,7 +314,7 @@ function renderDashboard(): void {
     dashboardContainer.appendChild(sectionDiv);
   });
 
-  // Привязка событий удаления внутри контейнера
+  // Привязка кнопок удаления
   const currentContainer = document.getElementById('dashboard-container');
   if (currentContainer) {
     currentContainer.querySelectorAll('.delete-btn').forEach(btn => {
@@ -397,7 +397,7 @@ function renderDashboard(): void {
     }
   });
 
-  // Привязка инпутов калькулятора (quantity / multiplier)
+  // Привязка инпутов калькулятора
   document.querySelectorAll('.item-calc-input').forEach(input => {
     input.addEventListener('change', async (e) => {
       const target = e.target as HTMLInputElement;
@@ -424,7 +424,7 @@ function renderDashboard(): void {
 }
 
 // ==========================================
-// 5. Логика кнопки "Refresh" (обновление времени и данных)
+// 5. Логика кнопки "Refresh"
 // ==========================================
 async function handleRefreshClick(): Promise<void> {
   const refreshBtn = document.getElementById('refresh-btn') as HTMLButtonElement | null;
@@ -433,14 +433,12 @@ async function handleRefreshClick(): Promise<void> {
     refreshBtn.style.opacity = '0.6';
   }
 
-  // Фиксируем новое время ТОЛЬКО по клику и сохраняем в память браузера
+  // Фиксируем время ТОЛЬКО при нажатии кнопки и сохраняем его
   const now = new Date();
   lastUpdateTime = now;
   localStorage.setItem('lastUpdateTime', now.toISOString());
 
   renderLastUpdateTime();
-
-  // Подгружаем свежие данные из базы
   await fetchItemsFromSupabase();
 
   if (refreshBtn) {
@@ -449,7 +447,6 @@ async function handleRefreshClick(): Promise<void> {
   }
 }
 
-// Привязываем обработчик к кнопке обновления
 const refreshButton = document.getElementById('refresh-btn');
 if (refreshButton) {
   refreshButton.addEventListener('click', handleRefreshClick);
@@ -459,5 +456,5 @@ if (refreshButton) {
 // 6. Запуск при старте страницы
 // ==========================================
 renderHeaderDate();
-renderLastUpdateTime();
+renderLastUpdateTime(); // Отобразит время из памяти (не сбросится на текущее)
 fetchItemsFromSupabase();

@@ -11,7 +11,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 const SUPABASE_URL = 'https://vuppdvlpsbyzhcmalhoi.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_frIjzGAOaW77jegazxN-_Q_OUqN-hzO';
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-const TABLE_NAME = 'sidose_tasks'; // Должно точно совпадать с названием в Supabase!
+const TABLE_NAME = 'sidose_tasks';
 const catalogDatabase = [
     { code: "714002", title: "End Paper A4 Portrait White", pdfUrl: "./docs/714002.pdf" },
     { code: "714003", title: "End Paper A4 Landscape White", pdfUrl: "./docs/doc-2.pdf" },
@@ -23,7 +23,7 @@ const catalogDatabase = [
     { code: "734007", title: "BXT A4 Portrait Black", pdfUrl: "./docs/doc-6.pdf" }
 ];
 let items = [];
-// Читаем сохраненное время из памяти браузера, чтобы оно не сбрасывалось при перезагрузке
+// Читаем из памяти браузера то время, которое было сохранено по кнопке в прошлый раз
 const savedTime = localStorage.getItem('lastUpdateTime');
 let lastUpdateTime = savedTime ? new Date(savedTime) : null;
 const dashboardContainer = document.getElementById('dashboard-container');
@@ -83,7 +83,7 @@ function fetchItemsFromSupabase() {
         }
     });
 }
-// Глобальная функция для кнопки "Done"
+// Глобальная функция для кнопки "Done" (перенос в Completed Goods)
 window.markAsReady = function (itemId) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
@@ -286,7 +286,7 @@ function renderDashboard() {
         sectionDiv.innerHTML = tableContent;
         dashboardContainer.appendChild(sectionDiv);
     });
-    // Привязка событий удаления внутри контейнера
+    // Привязка кнопок удаления
     const currentContainer = document.getElementById('dashboard-container');
     if (currentContainer) {
         currentContainer.querySelectorAll('.delete-btn').forEach(btn => {
@@ -362,7 +362,7 @@ function renderDashboard() {
             });
         }
     });
-    // Привязка инпутов калькулятора (quantity / multiplier)
+    // Привязка инпутов калькулятора
     document.querySelectorAll('.item-calc-input').forEach(input => {
         input.addEventListener('change', (e) => __awaiter(this, void 0, void 0, function* () {
             const target = e.target;
@@ -386,7 +386,7 @@ function renderDashboard() {
     });
 }
 // ==========================================
-// 5. Логика кнопки "Refresh" (обновление времени и данных)
+// 5. Логика кнопки "Refresh"
 // ==========================================
 function handleRefreshClick() {
     return __awaiter(this, void 0, void 0, function* () {
@@ -395,12 +395,11 @@ function handleRefreshClick() {
             refreshBtn.disabled = true;
             refreshBtn.style.opacity = '0.6';
         }
-        // Фиксируем новое время ТОЛЬКО по клику и сохраняем в память браузера
+        // Фиксируем время ТОЛЬКО при нажатии кнопки и сохраняем его
         const now = new Date();
         lastUpdateTime = now;
         localStorage.setItem('lastUpdateTime', now.toISOString());
         renderLastUpdateTime();
-        // Подгружаем свежие данные из базы
         yield fetchItemsFromSupabase();
         if (refreshBtn) {
             refreshBtn.disabled = false;
@@ -408,7 +407,6 @@ function handleRefreshClick() {
         }
     });
 }
-// Привязываем обработчик к кнопке обновления
 const refreshButton = document.getElementById('refresh-btn');
 if (refreshButton) {
     refreshButton.addEventListener('click', handleRefreshClick);
@@ -417,5 +415,5 @@ if (refreshButton) {
 // 6. Запуск при старте страницы
 // ==========================================
 renderHeaderDate();
-renderLastUpdateTime();
+renderLastUpdateTime(); // Отобразит время из памяти (не сбросится на текущее)
 fetchItemsFromSupabase();
