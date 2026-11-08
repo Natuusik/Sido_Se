@@ -23,9 +23,7 @@ const catalogDatabase = [
     { code: "734007", title: "BXT A4 Portrait Black", pdfUrl: "./docs/doc-6.pdf" }
 ];
 let items = [];
-// Читаем из памяти браузера то время, которое было сохранено по кнопке в прошлый раз
-const savedTime = localStorage.getItem('lastUpdateTime');
-let lastUpdateTime = savedTime ? new Date(savedTime) : null;
+let lastUpdateTime = null; // Общее время из базы для всех устройств
 const dashboardContainer = document.getElementById('dashboard-container');
 // ==========================================
 // 2. Вспомогательные функции рендеринга
@@ -62,17 +60,27 @@ function formatTitle(title) {
     });
 }
 // ==========================================
-// 3. Работа с Supabase
+// 3. Работа с Supabase (Загрузка задач + Общее время)
 // ==========================================
 function fetchItemsFromSupabase() {
     return __awaiter(this, void 0, void 0, function* () {
         try {
-            const { data, error } = yield supabaseClient.from(TABLE_NAME).select('*');
-            if (error) {
-                console.error('Supabase error:', error.message);
+            // 1. Загружаем задачи
+            const { data: taskData, error: taskError } = yield supabaseClient.from(TABLE_NAME).select('*');
+            if (taskError) {
+                console.error('Supabase tasks error:', taskError.message);
             }
-            else if (data) {
-                items = data;
+            else if (taskData) {
+                items = taskData;
+            }
+            // 2. Загружаем время последнего обновления из облачной базы
+            const { data: timeData, error: timeError } = yield supabaseClient
+                .from('app_settings')
+                .select('last_update_time')
+                .eq('id', 1)
+                .single();
+            if (!timeError && timeData && timeData.last_update_time) {
+                lastUpdateTime = new Date(timeData.last_update_time);
             }
         }
         catch (err) {
@@ -80,10 +88,11 @@ function fetchItemsFromSupabase() {
         }
         finally {
             renderDashboard();
+            renderLastUpdateTime();
         }
     });
 }
-// Глобальная функция для кнопки "Done" (перенос в Completed Goods)
+// Глобальная функция для кнопки "Done"
 window.markAsReady = function (itemId) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
@@ -386,7 +395,7 @@ function renderDashboard() {
     });
 }
 // ==========================================
-// 5. Логика кнопки "Refresh"
+// 5. Логика кнопки "Refresh" (Сохранение в базу для всех!)
 // ==========================================
 function handleRefreshClick() {
     return __awaiter(this, void 0, void 0, function* () {
@@ -395,11 +404,25 @@ function handleRefreshClick() {
             refreshBtn.disabled = true;
             refreshBtn.style.opacity = '0.6';
         }
-        // Фиксируем время ТОЛЬКО при нажатии кнопки и сохраняем его
         const now = new Date();
-        lastUpdateTime = now;
-        localStorage.setItem('lastUpdateTime', now.toISOString());
-        renderLastUpdateTime();
+        try {
+            // Сохраняем время прямо в таблицу Supabase, чтобы его видели все устройства
+            const { error } = yield supabaseClient
+                .from('app_settings')
+                .update({ last_update_time: now.toISOString() })
+                .eq('id', 1);
+            if (error) {
+                console.error('Ошибка сохранения времени в базу:', error);
+            }
+            else {
+                lastUpdateTime = now;
+                renderLastUpdateTime();
+            }
+        }
+        catch (err) {
+            console.error('Ошибка рефреша:', err);
+        }
+        // Подгружаем актуальные данные задач
         yield fetchItemsFromSupabase();
         if (refreshBtn) {
             refreshBtn.disabled = false;
@@ -415,5 +438,4 @@ if (refreshButton) {
 // 6. Запуск при старте страницы
 // ==========================================
 renderHeaderDate();
-renderLastUpdateTime(); // Отобразит время из памяти (не сбросится на текущее)
-fetchItemsFromSupabase();
+fetchItemsFromSupabase(); // Загружает задачи и общее время из облака при старте

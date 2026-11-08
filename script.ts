@@ -34,10 +34,7 @@ const catalogDatabase: CatalogItem[] = [
 ];
 
 let items: ProductionItem[] = [];
-
-// Читаем из памяти браузера то время, которое было сохранено по кнопке в прошлый раз
-const savedTime = localStorage.getItem('lastUpdateTime');
-let lastUpdateTime: Date | null = savedTime ? new Date(savedTime) : null;
+let lastUpdateTime: Date | null = null; // Общее время из базы для всех устройств
 
 const dashboardContainer = document.getElementById('dashboard-container');
 
@@ -81,24 +78,38 @@ function formatTitle(title: string): string {
 }
 
 // ==========================================
-// 3. Работа с Supabase
+// 3. Работа с Supabase (Загрузка задач + Общее время)
 // ==========================================
 async function fetchItemsFromSupabase(): Promise<void> {
   try {
-    const { data, error } = await supabaseClient.from(TABLE_NAME).select('*');
-    if (error) {
-      console.error('Supabase error:', error.message);
-    } else if (data) {
-      items = data as ProductionItem[];
+    // 1. Загружаем задачи
+    const { data: taskData, error: taskError } = await supabaseClient.from(TABLE_NAME).select('*');
+    if (taskError) {
+      console.error('Supabase tasks error:', taskError.message);
+    } else if (taskData) {
+      items = taskData as ProductionItem[];
     }
+
+    // 2. Загружаем время последнего обновления из облачной базы
+    const { data: timeData, error: timeError } = await supabaseClient
+      .from('app_settings')
+      .select('last_update_time')
+      .eq('id', 1)
+      .single();
+
+    if (!timeError && timeData && timeData.last_update_time) {
+      lastUpdateTime = new Date(timeData.last_update_time);
+    }
+
   } catch (err) {
     console.error('Fetch exception:', err);
   } finally {
     renderDashboard();
+    renderLastUpdateTime();
   }
 }
 
-// Глобальная функция для кнопки "Done" (перенос в Completed Goods)
+// Глобальная функция для кнопки "Done"
 (window as any).markAsReady = async function(itemId: number) {
   try {
     const { error } = await supabaseClient
@@ -424,7 +435,7 @@ function renderDashboard(): void {
 }
 
 // ==========================================
-// 5. Логика кнопки "Refresh"
+// 5. Логика кнопки "Refresh" (Сохранение в базу для всех!)
 // ==========================================
 async function handleRefreshClick(): Promise<void> {
   const refreshBtn = document.getElementById('refresh-btn') as HTMLButtonElement | null;
@@ -433,12 +444,26 @@ async function handleRefreshClick(): Promise<void> {
     refreshBtn.style.opacity = '0.6';
   }
 
-  // Фиксируем время ТОЛЬКО при нажатии кнопки и сохраняем его
   const now = new Date();
-  lastUpdateTime = now;
-  localStorage.setItem('lastUpdateTime', now.toISOString());
 
-  renderLastUpdateTime();
+  try {
+    // Сохраняем время прямо в таблицу Supabase, чтобы его видели все устройства
+    const { error } = await supabaseClient
+      .from('app_settings')
+      .update({ last_update_time: now.toISOString() })
+      .eq('id', 1);
+
+    if (error) {
+      console.error('Ошибка сохранения времени в базу:', error);
+    } else {
+      lastUpdateTime = now;
+      renderLastUpdateTime();
+    }
+  } catch (err) {
+    console.error('Ошибка рефреша:', err);
+  }
+
+  // Подгружаем актуальные данные задач
   await fetchItemsFromSupabase();
 
   if (refreshBtn) {
@@ -456,5 +481,4 @@ if (refreshButton) {
 // 6. Запуск при старте страницы
 // ==========================================
 renderHeaderDate();
-renderLastUpdateTime(); // Отобразит время из памяти (не сбросится на текущее)
-fetchItemsFromSupabase();
+fetchItemsFromSupabase(); // Загружает задачи и общее время из облака при старте
