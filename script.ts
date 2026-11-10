@@ -329,21 +329,94 @@ function renderDashboard(): void {
 
     sectionDiv.innerHTML = tableContent;
     dashboardContainer.appendChild(sectionDiv);
+  });
 
-    // Привязка кнопки печати (только эта секция)
+  // Логика Drag-and-Drop (перетаскивание строк)
+  let draggedItem: HTMLElement | null = null;
+
+  document.querySelectorAll('.draggable-row').forEach(row => {
+    row.addEventListener('dragstart', (e) => {
+      draggedItem = row as HTMLElement;
+      setTimeout(() => row.classList.add('opacity-40'), 0);
+    });
+
+    row.addEventListener('dragend', () => {
+      if (draggedItem) draggedItem.classList.remove('opacity-40');
+      draggedItem = null;
+    });
+
+    row.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      const container = row.closest('.task-list-container');
+      if (!container || !draggedItem) return;
+
+      const afterElement = getDragAfterElement(container, (e as DragEvent).clientY);
+      if (afterElement == null) {
+        container.appendChild(draggedItem);
+      } else {
+        container.insertBefore(draggedItem, afterElement);
+      }
+    });
+
+    row.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      const container = row.closest('.task-list-container');
+      if (!container) return;
+
+      // Собираем новый порядок элементов в массиве items
+      const newOrderIds = Array.from(container.querySelectorAll('.draggable-row')).map(r => Number(r.getAttribute('data-id')));
+      
+      const sectionKey = container.getAttribute('data-section');
+      const otherItems = items.filter(i => i.status !== sectionKey);
+      const reorderedSectionItems = newOrderIds.map(id => items.find(i => i.id === id)).filter(Boolean) as ProductionItem[];
+
+      items = [...otherItems, ...reorderedSectionItems];
+    });
+  });
+
+  function getDragAfterElement(container: Element, y: number) {
+    const draggableElements = Array.from(container.querySelectorAll('.draggable-row:not(.opacity-40)'));
+
+    return draggableElements.reduce((closest: { offset: number; element: Element | null }, child) => {
+      const box = child.getBoundingClientRect();
+      const offset = y - box.top - box.height / 2;
+      if (offset < 0 && offset > closest.offset) {
+        return { offset: offset, element: child };
+      } else {
+        return closest;
+      }
+    }, { offset: Number.NEGATIVE_INFINITY, element: null }).element;
+  }
+
+  // Привязка кнопок удаления
+  const currentContainer = document.getElementById('dashboard-container');
+  if (currentContainer) {
+    currentContainer.querySelectorAll('.delete-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = Number(btn.getAttribute('data-id'));
+        if (!id) return;
+        
+        const { error } = await supabaseClient.from(TABLE_NAME).delete().eq('id', id);
+        if (error) {
+          console.error('Error deleting item:', error);
+        } else {
+          await fetchItemsFromSupabase();
+        }
+      });
+    });
+  }
+
+  // Привязка кнопок печати и копирования в Word
+  targetSections.forEach(section => {
     const printBtn = document.getElementById(`print-${section.key}-table`);
     if (printBtn) {
-      printBtn.addEventListener('click', () => {
-        sectionDiv.classList.add('only-print-section');
-        window.print();
-        sectionDiv.classList.remove('only-print-section');
-      });
+      printBtn.addEventListener('click', () => window.print());
     }
 
-    // Привязка кнопки копирования в Word
     const copyBtn = document.getElementById(`copy-${section.key}-table`);
     if (copyBtn) {
       copyBtn.addEventListener('click', () => {
+        const groupItems = items.filter(item => item.status === section.key);
         if (groupItems.length === 0) {
           alert('В этой секции нет данных для копирования.');
           return;
@@ -364,7 +437,7 @@ function renderDashboard(): void {
             <tbody>
         `;
 
-        groupItems.forEach((item: any, index: number) => {
+        groupItems.forEach((item: any, index) => {
           const qty = item.quantity ?? 1;
           const mult = item.multiplier ?? 100;
           const total = qty * mult;
@@ -397,78 +470,6 @@ function renderDashboard(): void {
       });
     }
   });
-
-  // Логика Drag-and-Drop (перетаскивание строк)
-  let draggedItem: HTMLElement | null = null;
-
-  document.querySelectorAll('.draggable-row').forEach(row => {
-    row.addEventListener('dragstart', () => {
-      draggedItem = row as HTMLElement;
-      setTimeout(() => row.classList.add('opacity-40'), 0);
-    });
-
-    row.addEventListener('dragend', () => {
-      if (draggedItem) draggedItem.classList.remove('opacity-40');
-      draggedItem = null;
-    });
-
-    row.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      const container = row.closest('.task-list-container');
-      if (!container || !draggedItem) return;
-
-      const afterElement = getDragAfterElement(container, (e as DragEvent).clientY);
-      if (afterElement == null) {
-        container.appendChild(draggedItem);
-      } else {
-        container.insertBefore(draggedItem, afterElement);
-      }
-    });
-
-    row.addEventListener('drop', (e) => {
-      e.preventDefault();
-      const container = row.closest('.task-list-container');
-      if (!container) return;
-
-      const newOrderIds = Array.from(container.querySelectorAll('.draggable-row')).map(r => Number(r.getAttribute('data-id')));
-      const sectionKey = container.getAttribute('data-section');
-      const otherItems = items.filter(i => i.status !== sectionKey);
-      const reorderedSectionItems = newOrderIds.map(id => items.find(i => i.id === id)).filter(Boolean) as ProductionItem[];
-
-      items = [...otherItems, ...reorderedSectionItems];
-    });
-  });
-
-  function getDragAfterElement(container: Element, y: number) {
-    const draggableElements = Array.from(container.querySelectorAll('.draggable-row:not(.opacity-40)'));
-
-    return draggableElements.reduce((closest: { offset: number; element: Element | null }, child) => {
-      const box = child.getBoundingClientRect();
-      const offset = y - box.top - box.height / 2;
-      if (offset < 0 && offset > closest.offset) {
-        return { offset: offset, element: child };
-      } else {
-        return closest;
-      }
-    }, { offset: Number.NEGATIVE_INFINITY, element: null }).element;
-  }
-
-  // Привязка кнопок удаления
-  if (dashboardContainer) {
-    dashboardContainer.querySelectorAll('.delete-btn').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const id = Number(btn.getAttribute('data-id'));
-        if (!id) return;
-        
-        const { error } = await supabaseClient.from(TABLE_NAME).delete().eq('id', id);
-        if (error) {
-          console.error('Error deleting item:', error);
-        } else {
-          await fetchItemsFromSupabase();
-        }
-      });
-    });
-  }
 
   // Привязка инпутов калькулятора
   document.querySelectorAll('.item-calc-input').forEach(input => {
@@ -509,6 +510,7 @@ async function handleRefreshClick(): Promise<void> {
   const now = new Date();
 
   try {
+    // 1. Отправляем новое фиксированное время в базу данных Supabase
     const { error } = await supabaseClient
       .from('app_settings')
       .update({ last_update_time: now.toISOString() })
@@ -518,10 +520,12 @@ async function handleRefreshClick(): Promise<void> {
       console.error('Ошибка сохранения времени в базу:', error);
       alert('Не удалось обновить время в базе. Проверьте консоль (F12).');
     } else {
+      // 2. Обновляем локальную переменную и выводим на экран
       lastUpdateTime = now;
       renderLastUpdateTime();
     }
 
+    // 3. Подгружаем актуальные данные задач (не затирая время)
     const { data: taskData, error: taskError } = await supabaseClient.from(TABLE_NAME).select('*');
     if (taskError) {
       console.error('Ошибка загрузки задач:', taskError.message);
