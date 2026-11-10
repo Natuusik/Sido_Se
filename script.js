@@ -12,6 +12,9 @@ const SUPABASE_URL = 'https://vuppdvlpsbyzhcmalhoi.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_frIjzGAOaW77jegazxN-_Q_OUqN-hzO';
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const TABLE_NAME = 'sidose_tasks';
+// Элементы интерфейса
+const refreshButton = document.getElementById('refresh-btn');
+const lastUpdateDiv = document.getElementById('last-update-time');
 const catalogDatabase = [
     { code: "714002", title: "End Paper A4 Portrait White", pdfUrl: "./docs/714002.pdf" },
     { code: "714003", title: "End Paper A4 Landscape White", pdfUrl: "./docs/doc-2.pdf" },
@@ -62,9 +65,6 @@ function formatTitle(title) {
 // ==========================================
 // 3. Работа с Supabase (Загрузка задач + Общее время)
 // ==========================================
-// ==========================================
-// Загрузка данных и времени из Supabase
-// ==========================================
 function fetchItemsFromSupabase() {
     return __awaiter(this, void 0, void 0, function* () {
         try {
@@ -76,8 +76,7 @@ function fetchItemsFromSupabase() {
             else if (taskData) {
                 items = taskData;
             }
-            // 2. ВСЕГДА подгружаем последнее время из базы app_settings для всех устройств
-            // Загрузка времени последнего обновления из таблицы app_settings
+            // 2. Подгружаем последнее время из базы app_settings для всех устройств
             const { data: timeData, error: timeError } = yield supabaseClient
                 .from('app_settings')
                 .select('last_update_time')
@@ -95,7 +94,7 @@ function fetchItemsFromSupabase() {
         }
         finally {
             renderDashboard();
-            renderLastUpdateTime(); // Сразу рисуем то время, которое пришло из базы!
+            renderLastUpdateTime();
         }
     });
 }
@@ -121,7 +120,7 @@ window.markAsReady = function (itemId) {
     });
 };
 // ==========================================
-// 4. Отрисовка дашборда
+// 4. Отрисовка дашборда и Drag-and-Drop
 // ==========================================
 function renderDashboard() {
     if (!dashboardContainer)
@@ -204,18 +203,21 @@ function renderDashboard() {
         }));
     }
     // Секции (Completed Goods и In Progress)
+    // Секции (Completed Goods и In Progress) с улучшенным дизайном
     const targetSections = [
         {
             key: 'ready',
             title: '✅ Completed Goods',
-            bgClass: 'bg-emerald-50 border-emerald-300 shadow-xl shadow-stone-200/50',
-            badgeClass: 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+            // Стиль: белый чистый фон карточки, мягкая глубокая тень и аккуратная зеленая полоска слева
+            containerClass: 'bg-white border border-emerald-200/80 shadow-lg shadow-emerald-900/5 rounded-3xl p-6 md:p-8 mb-8',
+            headerBadge: 'bg-emerald-100 text-emerald-800 border border-emerald-200'
         },
         {
             key: 'process',
             title: '🛠️ In Progress',
-            bgClass: 'bg-blue-50 border-blue-300 shadow-xl shadow-stone-200/50',
-            badgeClass: 'bg-blue-100 text-blue-800 border border-blue-300'
+            // Стиль: белый фон, аккуратная синяя рамка и мягкая тень
+            containerClass: 'bg-white border border-blue-200/80 shadow-lg shadow-blue-900/5 rounded-3xl p-6 md:p-8 mb-8',
+            headerBadge: 'bg-blue-100 text-blue-800 border border-blue-200'
         }
     ];
     targetSections.forEach(section => {
@@ -223,27 +225,29 @@ function renderDashboard() {
         const count = groupItems.length;
         const sectionDiv = document.createElement('div');
         sectionDiv.id = `${section.key}-section`;
-        sectionDiv.className = `rounded-3xl p-4 md:p-8 border mb-8 ${section.bgClass}`;
+        sectionDiv.className = section.containerClass; // Применяем новые красивые стили
         const actionButtonsHtml = count > 0
             ? `<div class="flex flex-wrap items-center gap-2 no-print">
           <button id="print-${section.key}-table" class="bg-stone-800 hover:bg-stone-900 text-white text-xs px-3.5 py-2 rounded-xl font-medium transition-colors shadow-sm flex items-center space-x-1"><span>🖨️ Print / PDF</span></button>
           <button id="copy-${section.key}-table" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3.5 py-2 rounded-xl font-medium transition-colors shadow-sm flex items-center space-x-1"><span>📋 To Word</span></button>
         </div>`
             : '';
+        // Шапка секции с разделяющей тонкой линией снизу для воздуха
         let tableContent = `
-      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 mb-6 border-b border-stone-100">
         <div class="flex items-center space-x-3">
-          <h2 class="text-lg md:text-xl font-bold text-stone-900">${section.title}</h2>
-          <span class="text-xs px-3 py-1 rounded-full font-semibold ${section.badgeClass}">${count} items</span>
+          <h2 class="text-lg md:text-xl font-extrabold text-stone-900 tracking-tight">${section.title}</h2>
+          <span class="text-xs px-3 py-1 rounded-full font-semibold ${section.headerBadge}">${count} items</span>
         </div>
         ${actionButtonsHtml}
       </div>
     `;
         if (count === 0) {
-            tableContent += `<p class="text-stone-400 text-sm italic py-2">No items in this category.</p>`;
+            tableContent += `<p class="text-stone-400 text-sm italic py-4 text-center bg-stone-50/50 rounded-2xl border border-dashed border-stone-200">No items in this category.</p>`;
         }
         else {
-            tableContent += `<div class="space-y-3">`;
+            tableContent += `<div class="space-y-3 task-list-container" data-section="${section.key}">`;
+            // ... дальше ваш цикл отрисовки карточек задач
             groupItems.forEach((item, index) => {
                 var _a, _b;
                 let actionButton = '';
@@ -268,9 +272,9 @@ function renderDashboard() {
                 const currentMultiplier = (_b = item.multiplier) !== null && _b !== void 0 ? _b : 100;
                 const rowTotal = currentQty * currentMultiplier;
                 tableContent += `
-          <div draggable="true" data-id="${item.id}" class="draggable-row flex flex-col xl:flex-row items-start xl:items-center justify-between p-4 bg-white rounded-2xl border border-stone-200/80 border-l-4 ${borderAccentClass} shadow-sm transition-all hover:shadow-md gap-4">
+          <div draggable="true" data-id="${item.id}" class="draggable-row flex flex-col xl:flex-row items-start xl:items-center justify-between p-4 bg-white rounded-2xl border border-stone-200/80 border-l-4 ${borderAccentClass} shadow-sm transition-all hover:shadow-md gap-4 cursor-grab active:cursor-grabbing">
             <div class="flex items-center space-x-3 w-full xl:w-auto overflow-hidden">
-              <span class="text-stone-300 hover:text-stone-500 cursor-grab select-none text-base hidden sm:inline" title="Drag to reorder">⠿</span>
+              <span class="text-stone-300 hover:text-stone-500 select-none text-base hidden sm:inline" title="Drag to reorder">⠿</span>
               <span class="text-stone-400 font-bold text-xs w-6 text-center bg-stone-100 py-1 rounded-lg shrink-0">${index + 1}</span>
               <a href="${item.pdfUrl}" target="_blank" title="Open PDF" class="group flex items-center space-x-1.5 bg-stone-50 hover:bg-blue-50 px-3 py-1.5 rounded-xl border border-stone-200 transition-colors shrink-0">
                 <span class="font-mono font-bold text-blue-600 text-sm">${item.code}</span>
@@ -301,35 +305,19 @@ function renderDashboard() {
         }
         sectionDiv.innerHTML = tableContent;
         dashboardContainer.appendChild(sectionDiv);
-    });
-    // Привязка кнопок удаления
-    const currentContainer = document.getElementById('dashboard-container');
-    if (currentContainer) {
-        currentContainer.querySelectorAll('.delete-btn').forEach(btn => {
-            btn.addEventListener('click', () => __awaiter(this, void 0, void 0, function* () {
-                const id = Number(btn.getAttribute('data-id'));
-                if (!id)
-                    return;
-                const { error } = yield supabaseClient.from(TABLE_NAME).delete().eq('id', id);
-                if (error) {
-                    console.error('Error deleting item:', error);
-                }
-                else {
-                    yield fetchItemsFromSupabase();
-                }
-            }));
-        });
-    }
-    // Привязка кнопок печати и копирования в Word
-    targetSections.forEach(section => {
+        // Привязка кнопки печати (только эта секция)
         const printBtn = document.getElementById(`print-${section.key}-table`);
         if (printBtn) {
-            printBtn.addEventListener('click', () => window.print());
+            printBtn.addEventListener('click', () => {
+                sectionDiv.classList.add('only-print-section');
+                window.print();
+                sectionDiv.classList.remove('only-print-section');
+            });
         }
+        // Привязка кнопки копирования в Word
         const copyBtn = document.getElementById(`copy-${section.key}-table`);
         if (copyBtn) {
             copyBtn.addEventListener('click', () => {
-                const groupItems = items.filter(item => item.status === section.key);
                 if (groupItems.length === 0) {
                     alert('В этой секции нет данных для копирования.');
                     return;
@@ -378,6 +366,73 @@ function renderDashboard() {
             });
         }
     });
+    // Логика Drag-and-Drop (перетаскивание строк)
+    let draggedItem = null;
+    document.querySelectorAll('.draggable-row').forEach(row => {
+        row.addEventListener('dragstart', () => {
+            draggedItem = row;
+            setTimeout(() => row.classList.add('opacity-40'), 0);
+        });
+        row.addEventListener('dragend', () => {
+            if (draggedItem)
+                draggedItem.classList.remove('opacity-40');
+            draggedItem = null;
+        });
+        row.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            const container = row.closest('.task-list-container');
+            if (!container || !draggedItem)
+                return;
+            const afterElement = getDragAfterElement(container, e.clientY);
+            if (afterElement == null) {
+                container.appendChild(draggedItem);
+            }
+            else {
+                container.insertBefore(draggedItem, afterElement);
+            }
+        });
+        row.addEventListener('drop', (e) => {
+            e.preventDefault();
+            const container = row.closest('.task-list-container');
+            if (!container)
+                return;
+            const newOrderIds = Array.from(container.querySelectorAll('.draggable-row')).map(r => Number(r.getAttribute('data-id')));
+            const sectionKey = container.getAttribute('data-section');
+            const otherItems = items.filter(i => i.status !== sectionKey);
+            const reorderedSectionItems = newOrderIds.map(id => items.find(i => i.id === id)).filter(Boolean);
+            items = [...otherItems, ...reorderedSectionItems];
+        });
+    });
+    function getDragAfterElement(container, y) {
+        const draggableElements = Array.from(container.querySelectorAll('.draggable-row:not(.opacity-40)'));
+        return draggableElements.reduce((closest, child) => {
+            const box = child.getBoundingClientRect();
+            const offset = y - box.top - box.height / 2;
+            if (offset < 0 && offset > closest.offset) {
+                return { offset: offset, element: child };
+            }
+            else {
+                return closest;
+            }
+        }, { offset: Number.NEGATIVE_INFINITY, element: null }).element;
+    }
+    // Привязка кнопок удаления
+    if (dashboardContainer) {
+        dashboardContainer.querySelectorAll('.delete-btn').forEach(btn => {
+            btn.addEventListener('click', () => __awaiter(this, void 0, void 0, function* () {
+                const id = Number(btn.getAttribute('data-id'));
+                if (!id)
+                    return;
+                const { error } = yield supabaseClient.from(TABLE_NAME).delete().eq('id', id);
+                if (error) {
+                    console.error('Error deleting item:', error);
+                }
+                else {
+                    yield fetchItemsFromSupabase();
+                }
+            }));
+        });
+    }
     // Привязка инпутов калькулятора
     document.querySelectorAll('.item-calc-input').forEach(input => {
         input.addEventListener('change', (e) => __awaiter(this, void 0, void 0, function* () {
@@ -402,7 +457,7 @@ function renderDashboard() {
     });
 }
 // ==========================================
-// Логика кнопки "Refresh" с реальным обновлением времени
+// 5. Логика кнопки "Refresh"
 // ==========================================
 function handleRefreshClick() {
     return __awaiter(this, void 0, void 0, function* () {
@@ -411,10 +466,8 @@ function handleRefreshClick() {
             refreshBtn.disabled = true;
             refreshBtn.style.opacity = '0.6';
         }
-        // Получаем самое точное текущее время прямо в момент нажатия
         const now = new Date();
         try {
-            // 1. Отправляем новое время в базу данных Supabase
             const { error } = yield supabaseClient
                 .from('app_settings')
                 .update({ last_update_time: now.toISOString() })
@@ -424,25 +477,22 @@ function handleRefreshClick() {
                 alert('Не удалось обновить время в базе. Проверьте консоль (F12).');
             }
             else {
-                // 2. Если запись прошла успешно — обновляем переменную и выводим на экран
                 lastUpdateTime = now;
                 renderLastUpdateTime();
             }
-            // 3. Подгружаем актуальные данные задач
             const { data: taskData, error: taskError } = yield supabaseClient.from(TABLE_NAME).select('*');
             if (taskError) {
                 console.error('Ошибка загрузки задач:', taskError.message);
             }
             else if (taskData) {
                 items = taskData;
-                renderDashboard(); // Перерисовываем задачи
+                renderDashboard();
             }
         }
         catch (err) {
             console.error('Ошибка рефреша:', err);
         }
         finally {
-            // Возвращаем кнопку в активное состояние
             if (refreshBtn) {
                 refreshBtn.disabled = false;
                 refreshBtn.style.opacity = '1';
@@ -450,8 +500,12 @@ function handleRefreshClick() {
         }
     });
 }
+// Привязываем клик к кнопке
+if (refreshButton) {
+    refreshButton.addEventListener('click', handleRefreshClick);
+}
 // ==========================================
 // 6. Запуск при старте страницы
 // ==========================================
 renderHeaderDate();
-fetchItemsFromSupabase(); // Загружает задачи и общее время из облака при старте
+fetchItemsFromSupabase();
