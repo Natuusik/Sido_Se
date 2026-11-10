@@ -401,34 +401,52 @@ function renderDashboard() {
         }));
     });
 }
-// Обновленный обработчик клика по кнопке Refresh
+// ==========================================
+// Логика кнопки "Refresh" с реальным обновлением времени
+// ==========================================
 function handleRefreshClick() {
     return __awaiter(this, void 0, void 0, function* () {
+        const refreshBtn = document.getElementById('refresh-btn');
+        if (refreshBtn) {
+            refreshBtn.disabled = true;
+            refreshBtn.style.opacity = '0.6';
+        }
+        // Получаем самое точное текущее время прямо в момент нажатия
         const now = new Date();
-        // Сразу показываем время на экране, чтобы оно не пропадало
-        lastUpdateTime = now;
-        renderLastUpdateTime();
         try {
-            // Сохраняем свежее время в таблицу app_settings в Supabase
+            // 1. Отправляем новое время в базу данных Supabase
             const { error } = yield supabaseClient
                 .from('app_settings')
                 .update({ last_update_time: now.toISOString() })
                 .eq('id', 1);
             if (error) {
                 console.error('Ошибка сохранения времени в базу:', error);
+                alert('Не удалось обновить время в базе. Проверьте консоль (F12).');
             }
-            // Загружаем обратно только задачи (не трогая время, чтобы оно не сбросилось)
+            else {
+                // 2. Если запись прошла успешно — обновляем переменную и выводим на экран
+                lastUpdateTime = now;
+                renderLastUpdateTime();
+            }
+            // 3. Подгружаем актуальные данные задач
             const { data: taskData, error: taskError } = yield supabaseClient.from(TABLE_NAME).select('*');
             if (taskError) {
                 console.error('Ошибка загрузки задач:', taskError.message);
             }
             else if (taskData) {
                 items = taskData;
-                renderDashboard();
+                renderDashboard(); // Перерисовываем задачи
             }
         }
         catch (err) {
-            console.error('Ошибка при обновлении:', err);
+            console.error('Ошибка рефреша:', err);
+        }
+        finally {
+            // Возвращаем кнопку в активное состояние
+            if (refreshBtn) {
+                refreshBtn.disabled = false;
+                refreshBtn.style.opacity = '1';
+            }
         }
     });
 }
