@@ -7,6 +7,28 @@
   <!-- Подключаем Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
 <style>
+
+    /* Настройки для мобильной версии (экраны до 640px) */
+  @media (max-width: 640px) {
+    /* Находим верхнюю строку карточки, где лежат номер, код и название, и разрешаем перенос */
+    #dashboard-container [class*="rounded-2xl"][class*="border"] > div:first-child,
+    #dashboard-container [class*="rounded-xl"][class*="border"] > div:first-child {
+      flex-wrap: wrap !important;
+      row-gap: 8px !important;
+    }
+
+    /* Название товара (последний элемент в верхней строке) ставим на новую строку на всю ширину */
+    #dashboard-container [class*="rounded-2xl"][class*="border"] > div:first-child > *:last-child,
+    #dashboard-container [class*="rounded-xl"][class*="border"] > div:first-child > *:last-child {
+      flex-basis: 100% !important;
+      width: 100% !important;
+      white-space: normal !important; /* Отменяем обрезание текста многоточием (truncate) */
+      overflow: visible !important;
+      text-overflow: clip !important;
+      padding-left: 2px !important;
+    }
+  }
+
   /* Скрываем печатную таблицу на обычном экране */
   #custom-print-area {
     display: none;
