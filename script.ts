@@ -28,15 +28,19 @@ interface ProductionItem extends CatalogItem {
 
 const catalogDatabase: CatalogItem[] = [
   { code: "714002", title: "End Paper A4 Portrait White", pdfUrl: "./docs/714002.pdf" },
-  { code: "714003", title: "End Paper A4 Landscape White", pdfUrl: "./docs/doc-2.pdf" },
-  { code: "7714021", title: "End Paper A4 Portrait HD White End papers", pdfUrl: "./docs/7714021.pdf" },
-  { code: "714005", title: "End Paper A4 Landscape Color", pdfUrl: "./docs/doc-4.pdf" },
-  { code: "732008", title: "BXT Letter Portrait White", pdfUrl: "./docs/732008.pdf" },
-  { code: "792008", title: "Inkjet 329x530", pdfUrl: "./docs/792008.pdf" },
-  { code: "792007", title: "Lazer 329x500", pdfUrl: "./docs/792007.pdf" },
-  { code: "734007", title: "BXT A4 Portrait Black", pdfUrl: "./docs/doc-6.pdf" }
+  { code: "714003", title: "End Paper A4 Landscape White", pdfUrl: "./docs/714003.pdf" },
+  { code: "714004", title: "End Paper A3 Portrait White", pdfUrl: "./docs/714004.pdf" },
+  { code: "714005", title: "End Paper Letter Portrait White", pdfUrl: "./docs/714005.pdf" },
+  { code: "714006", title: "End Paper Letter Landscape White", pdfUrl: "./docs/714006.pdf" },
+  { code: "714007", title: "End Paper 305x305 Square White", pdfUrl: "./docs/714007.pdf" },
+  { code: "714008", title: "End Paper Ledger Portrait White", pdfUrl: "./docs/714008.pdf" },
+  { code: "714011", title: "End Paper A4 Portrait Black", pdfUrl: "./docs/714011.pdf" },
+  { code: "714012", title: "End Paper A4 landscape Black", pdfUrl: "./docs/714012.pdf" },
+  { code: "714013", title: "End Paper A3 Portrait Black", pdfUrl: "./docs/714013.pdf" },
+  { code: "714014", title: "End Paper Letter Portrait Black", pdfUrl: "./docs/714014.pdf" },
+  { code: "714016", title: "End Paper 305x305 Square Black", pdfUrl: "./docs/714016.pdf" },
+  { code: "732008", title: "BXT Letter Portrait White", pdfUrl: "./docs/732008.pdf" }
 ];
-
 let items: ProductionItem[] = [];
 let lastUpdateTime: Date | null = null; // Общее время из базы для всех устройств
 
