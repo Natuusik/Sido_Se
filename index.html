@@ -71,6 +71,41 @@
     <main id="dashboard-container" class="space-y-6"></main>
 
   </div>
+  <script>
+  document.addEventListener('click', (e) => {
+    // Ищем кнопку печати, по которой кликнули
+    const printBtn = e.target.closest('button[id^="print-"][id$="-table"]');
+    if (!printBtn) return;
+
+    // Останавливаем стандартный вызов пустой печати из script.js
+    e.stopImmediatePropagation();
+
+    // Находим карточку/секцию, внутри которой лежит эта кнопка и её таблица
+    const section = printBtn.closest('section') 
+                 || printBtn.closest('.bg-white') 
+                 || printBtn.closest('div[id]');
+
+    if (!section) {
+      alert('Не удалось определить секцию для печати.');
+      return;
+    }
+
+    // Убираем класс печати со всех элементов и вешаем на выбранную секцию
+    document.querySelectorAll('.only-print-section').forEach(el => {
+      el.classList.remove('only-print-section');
+    });
+    section.classList.add('only-print-section');
+
+    // Запускаем печать
+    window.print();
+
+    // Очищаем класс после печати
+    setTimeout(() => {
+      section.classList.remove('only-print-section');
+    }, 500);
+  }, true); // true перехватывает клик раньше, чем сработает script.js
+</script>
+
 <!-- Подключаем Supabase клиент через CDN -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <!-- Подключаем скомпилированный скрипт -->

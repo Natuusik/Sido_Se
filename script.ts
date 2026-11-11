@@ -39,7 +39,7 @@ const catalogDatabase: CatalogItem[] = [
   { code: "714013", title: "End Paper A3 Portrait Black", pdfUrl: "./docs/714013.pdf" },
   { code: "714014", title: "End Paper Letter Portrait Black", pdfUrl: "./docs/714014.pdf" },
   { code: "714016", title: "End Paper 305x305 Square Black", pdfUrl: "./docs/714016.pdf" },
-  { code: "732008", title: "BXT Letter Portrait White", pdfUrl: "./docs/732008.pdf" }
+  { code: "732008", title: "BXT Letter Portrait White", pdfUrl: "./docs/732008.pdf" },
 ];
 let items: ProductionItem[] = [];
 let lastUpdateTime: Date | null = null; // Общее время из базы для всех устройств
@@ -422,69 +422,96 @@ function renderDashboard(): void {
   }
 
   // Привязка кнопок печати и копирования в Word
-  targetSections.forEach(section => {
-    const printBtn = document.getElementById(`print-${section.key}-table`);
-    if (printBtn) {
-      printBtn.addEventListener('click', () => window.print());
-    }
+ // Привязка кнопок печати и копирования в Word
+targetSections.forEach(section => {
+  const printBtn = document.getElementById(`print-${section.key}-table`);
+  if (printBtn) {
+    printBtn.addEventListener('click', () => {
+      // Находим блок секции (ищем по ID секции или берем ближайший родительский блок/секцию)
+      const sectionEl = document.getElementById(`section-${section.key}`) 
+                     || document.getElementById(section.key) 
+                     || printBtn.closest('section, .card, .section-container, div');
 
-    const copyBtn = document.getElementById(`copy-${section.key}-table`);
-    if (copyBtn) {
-      copyBtn.addEventListener('click', () => {
-        const groupItems = items.filter(item => item.status === section.key);
-        if (groupItems.length === 0) {
-          alert('В этой секции нет данных для копирования.');
-          return;
-        }
-
-        let htmlTable = `
-          <table border="1" cellspacing="0" cellpadding="5" style="border-collapse: collapse; font-family: Arial, sans-serif; font-size: 14px; width: 100%;">
-            <thead>
-              <tr style="background-color: #f3f4f6; text-align: left;">
-                <th style="padding: 8px; border: 1px solid #d1d5db;">№</th>
-                <th style="padding: 8px; border: 1px solid #d1d5db;">Код</th>
-                <th style="padding: 8px; border: 1px solid #d1d5db;">Название товара</th>
-                <th style="padding: 8px; border: 1px solid #d1d5db; text-align: center;">Количество</th>
-                <th style="padding: 8px; border: 1px solid #d1d5db; text-align: center;">Множитель</th>
-                <th style="padding: 8px; border: 1px solid #d1d5db; text-align: right;">Итого</th>
-              </tr>
-            </thead>
-            <tbody>
-        `;
-
-        groupItems.forEach((item: any, index) => {
-          const qty = item.quantity ?? 1;
-          const mult = item.multiplier ?? 100;
-          const total = qty * mult;
-
-          htmlTable += `
-            <tr>
-              <td style="padding: 8px; border: 1px solid #d1d5db; text-align: center;">${index + 1}</td>
-              <td style="padding: 8px; border: 1px solid #d1d5db; font-family: monospace; font-weight: bold;">${item.code}</td>
-              <td style="padding: 8px; border: 1px solid #d1d5db;">${item.title}</td>
-              <td style="padding: 8px; border: 1px solid #d1d5db; text-align: center;">${qty}</td>
-              <td style="padding: 8px; border: 1px solid #d1d5db; text-align: center;">${mult}</td>
-              <td style="padding: 8px; border: 1px solid #d1d5db; text-align: right; font-weight: bold;">${total}</td>
-            </tr>
-          `;
-        });
-
-        htmlTable += `</tbody></table>`;
-
-        const clipboardItem = new ClipboardItem({
-          "text/html": new Blob([htmlTable], { type: "text/html" }),
-          "text/plain": new Blob([htmlTable.replace(/<[^>]*>?/gm, '')], { type: "text/plain" })
-        });
-
-        navigator.clipboard.write([clipboardItem]).then(() => {
-          alert(`Таблица секции "${section.title}" успешно скопирована! Вставьте в Word (Ctrl + V).`);
-        }).catch(err => {
-          console.error('Ошибка копирования:', err);
-          alert('Не удалось скопировать таблицу.');
-        });
+      // Очищаем класс печати у всех остальных элементов на всякий случай
+      document.querySelectorAll('.only-print-section').forEach(el => {
+        el.classList.remove('only-print-section');
       });
-    }
-  });
+
+      if (sectionEl) {
+        // Добавляем класс, который разрешает отображение при печати
+        sectionEl.classList.add('only-print-section');
+
+        // Запускаем печать
+        window.print();
+
+        // Убираем класс после закрытия окна печати (с небольшой задержкой для надежности)
+        setTimeout(() => {
+          sectionEl.classList.remove('only-print-section');
+        }, 500);
+      } else {
+        alert('Не удалось найти блок секции для печати.');
+      }
+    });
+  }
+
+  const copyBtn = document.getElementById(`copy-${section.key}-table`);
+  if (copyBtn) {
+    copyBtn.addEventListener('click', () => {
+      const groupItems = items.filter(item => item.status === section.key);
+      if (groupItems.length === 0) {
+        alert('В этой секции нет данных для копирования.');
+        return;
+      }
+
+      let htmlTable = `
+        <table border="1" cellspacing="0" cellpadding="5" style="border-collapse: collapse; font-family: Arial, sans-serif; font-size: 14px; width: 100%;">
+          <thead>
+            <tr style="background-color: #f3f4f6; text-align: left;">
+              <th style="padding: 8px; border: 1px solid #d1d5db;">№</th>
+              <th style="padding: 8px; border: 1px solid #d1d5db;">Код</th>
+              <th style="padding: 8px; border: 1px solid #d1d5db;">Название товара</th>
+              <th style="padding: 8px; border: 1px solid #d1d5db; text-align: center;">Количество</th>
+              <th style="padding: 8px; border: 1px solid #d1d5db; text-align: center;">Множитель</th>
+              <th style="padding: 8px; border: 1px solid #d1d5db; text-align: right;">Итого</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+
+      groupItems.forEach((item, index) => {
+        const qty = item.quantity ?? 1;
+        const mult = item.multiplier ?? 100;
+        const total = qty * mult; // Исправлен знак умножения
+
+        htmlTable += `
+          <tr>
+            <td style="padding: 8px; border: 1px solid #d1d5db; text-align: center;">${index + 1}</td>
+            <td style="padding: 8px; border: 1px solid #d1d5db; font-family: monospace; font-weight: bold;">${item.code}</td>
+            <td style="padding: 8px; border: 1px solid #d1d5db;">${item.title}</td>
+            <td style="padding: 8px; border: 1px solid #d1d5db; text-align: center;">${qty}</td>
+            <td style="padding: 8px; border: 1px solid #d1d5db; text-align: center;">${mult}</td>
+            <td style="padding: 8px; border: 1px solid #d1d5db; text-align: right; font-weight: bold;">${total}</td>
+          </tr>
+        `;
+      });
+
+      htmlTable += `</tbody></table>`;
+
+      const clipboardItem = new ClipboardItem({
+        "text/html": new Blob([htmlTable], { type: "text/html" }),
+        "text/plain": new Blob([htmlTable.replace(/<[^>]*>?/gm, '')], { type: "text/plain" })
+      });
+
+      navigator.clipboard.write([clipboardItem]).then(() => {
+        alert(`Таблица секции "${section.title}" успешно скопирована! Вставьте в Word (Ctrl + V).`);
+      }).catch(err => {
+        console.error('Ошибка копирования:', err);
+        alert('Не удалось скопировать таблицу.');
+      });
+    });
+  }
+});
+
 
   // Привязка инпутов калькулятора
   document.querySelectorAll('.item-calc-input').forEach(input => {
