@@ -59,6 +59,11 @@ function renderHeaderDate(): void {
   dateContainer.innerText = today.charAt(0).toUpperCase() + today.slice(1);
 }
 
+// Вспомогательная функция для добавления ведущего нуля (работает везде без padStart)
+function pad(n: number): string {
+  return n < 10 ? '0' + n : String(n);
+}
+
 function renderLastUpdateTime(): void {
   const timeContainer = document.getElementById('last-update-time');
   if (!timeContainer) return;
@@ -68,11 +73,18 @@ function renderLastUpdateTime(): void {
     return;
   }
 
-  const hours = ('0' + lastUpdateTime.getHours()).slice(-2);
-  const minutes = ('0' + lastUpdateTime.getMinutes()).slice(-2);
-  const seconds = ('0' + lastUpdateTime.getSeconds()).slice(-2);
+  const d = lastUpdateTime as any;
 
-  timeContainer.innerText = `Updated: ${hours}:${minutes}:${seconds}`;
+  const day = pad(d.getDate());
+  const month = pad(d.getMonth() + 1);
+  const year = d.getFullYear();
+
+  const hours = pad(d.getHours());
+  const minutes = pad(d.getMinutes());
+  const seconds = pad(d.getSeconds());
+
+  // Выводим полную дату и время (ДД.ММ.ГГГГ ЧЧ:ММ:СС)
+  timeContainer.innerText = `Updated: ${day}.${month}.${year} ${hours}:${minutes}:${seconds}`;
 }
 
 function formatTitle(title: string): string {
@@ -335,7 +347,7 @@ function renderDashboard(): void {
   let draggedItem: HTMLElement | null = null;
 
   document.querySelectorAll('.draggable-row').forEach(row => {
-    row.addEventListener('dragstart', (e) => {
+    row.addEventListener('dragstart', () => {
       draggedItem = row as HTMLElement;
       setTimeout(() => row.classList.add('opacity-40'), 0);
     });
@@ -363,7 +375,6 @@ function renderDashboard(): void {
       const container = row.closest('.task-list-container');
       if (!container) return;
 
-      // Собираем новый порядок элементов в массиве items
       const newOrderIds = Array.from(container.querySelectorAll('.draggable-row')).map(r => Number(r.getAttribute('data-id')));
       
       const sectionKey = container.getAttribute('data-section');
@@ -510,7 +521,7 @@ async function handleRefreshClick(): Promise<void> {
   const now = new Date();
 
   try {
-    // 1. Отправляем новое фиксированное время в базу данных Supabase
+    // 1. Отправляем точную дату и время в таблицу app_settings в Supabase
     const { error } = await supabaseClient
       .from('app_settings')
       .update({ last_update_time: now.toISOString() })
@@ -520,12 +531,12 @@ async function handleRefreshClick(): Promise<void> {
       console.error('Ошибка сохранения времени в базу:', error);
       alert('Не удалось обновить время в базе. Проверьте консоль (F12).');
     } else {
-      // 2. Обновляем локальную переменную и выводим на экран
+      // 2. Обновляем локально и выводим на экран
       lastUpdateTime = now;
       renderLastUpdateTime();
     }
 
-    // 3. Подгружаем актуальные данные задач (не затирая время)
+    // 3. Подгружаем актуальные данные задач
     const { data: taskData, error: taskError } = await supabaseClient.from(TABLE_NAME).select('*');
     if (taskError) {
       console.error('Ошибка загрузки задач:', taskError.message);

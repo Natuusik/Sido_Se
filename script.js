@@ -44,6 +44,10 @@ function renderHeaderDate() {
     const today = new Date().toLocaleDateString('en-US', options);
     dateContainer.innerText = today.charAt(0).toUpperCase() + today.slice(1);
 }
+// Вспомогательная функция для добавления ведущего нуля (работает везде без padStart)
+function pad(n) {
+    return n < 10 ? '0' + n : String(n);
+}
 function renderLastUpdateTime() {
     const timeContainer = document.getElementById('last-update-time');
     if (!timeContainer)
@@ -52,10 +56,15 @@ function renderLastUpdateTime() {
         timeContainer.innerText = 'Updated: ---';
         return;
     }
-    const hours = ('0' + lastUpdateTime.getHours()).slice(-2);
-    const minutes = ('0' + lastUpdateTime.getMinutes()).slice(-2);
-    const seconds = ('0' + lastUpdateTime.getSeconds()).slice(-2);
-    timeContainer.innerText = `Updated: ${hours}:${minutes}:${seconds}`;
+    const d = lastUpdateTime;
+    const day = pad(d.getDate());
+    const month = pad(d.getMonth() + 1);
+    const year = d.getFullYear();
+    const hours = pad(d.getHours());
+    const minutes = pad(d.getMinutes());
+    const seconds = pad(d.getSeconds());
+    // Выводим полную дату и время (ДД.ММ.ГГГГ ЧЧ:ММ:СС)
+    timeContainer.innerText = `Updated: ${day}.${month}.${year} ${hours}:${minutes}:${seconds}`;
 }
 function formatTitle(title) {
     return title.replace(/black/gi, function (match) {
@@ -304,7 +313,7 @@ function renderDashboard() {
     // Логика Drag-and-Drop (перетаскивание строк)
     let draggedItem = null;
     document.querySelectorAll('.draggable-row').forEach(row => {
-        row.addEventListener('dragstart', (e) => {
+        row.addEventListener('dragstart', () => {
             draggedItem = row;
             setTimeout(() => row.classList.add('opacity-40'), 0);
         });
@@ -331,7 +340,6 @@ function renderDashboard() {
             const container = row.closest('.task-list-container');
             if (!container)
                 return;
-            // Собираем новый порядок элементов в массиве items
             const newOrderIds = Array.from(container.querySelectorAll('.draggable-row')).map(r => Number(r.getAttribute('data-id')));
             const sectionKey = container.getAttribute('data-section');
             const otherItems = items.filter(i => i.status !== sectionKey);
@@ -463,7 +471,7 @@ function handleRefreshClick() {
         }
         const now = new Date();
         try {
-            // 1. Отправляем новое фиксированное время в базу данных Supabase
+            // 1. Отправляем точную дату и время в таблицу app_settings в Supabase
             const { error } = yield supabaseClient
                 .from('app_settings')
                 .update({ last_update_time: now.toISOString() })
@@ -473,11 +481,11 @@ function handleRefreshClick() {
                 alert('Не удалось обновить время в базе. Проверьте консоль (F12).');
             }
             else {
-                // 2. Обновляем локальную переменную и выводим на экран
+                // 2. Обновляем локально и выводим на экран
                 lastUpdateTime = now;
                 renderLastUpdateTime();
             }
-            // 3. Подгружаем актуальные данные задач (не затирая время)
+            // 3. Подгружаем актуальные данные задач
             const { data: taskData, error: taskError } = yield supabaseClient.from(TABLE_NAME).select('*');
             if (taskError) {
                 console.error('Ошибка загрузки задач:', taskError.message);
