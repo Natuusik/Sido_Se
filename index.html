@@ -6,37 +6,72 @@
   <title>ERP Dashboard - Управление производством</title>
   <!-- Подключаем Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
- <style>
+<style>
+  /* Скрываем печатную таблицу на обычном экране */
+  #custom-print-area {
+    display: none;
+  }
+
   @media print {
-    /* Скрываем вообще всё на странице по умолчанию */
-    body * {
-      visibility: hidden;
+    @page {
+      margin: 12mm;
     }
-    
-    /* Делаем видимой только ту секцию, которой добавлен класс печати */
-    .only-print-section, .only-print-section * {
-      visibility: visible;
-    }
-    
-    /* Перемещаем выбранную секцию в левый верхний угол листа */
-    .only-print-section {
-      position: absolute;
-      left: 0;
-      top: 0;
-      width: 100%;
-      margin: 0 !important;
-      padding: 10px !important;
-      border: none !important;
-      box-shadow: none !important;
-      background: white !important;
-    }
-    
-    /* Автоматически скрываем кнопки (Печать, Удалить, Готово) при печати */
-    .no-print {
+
+    /* Прячем весь интерфейс сайта при печати */
+    body > *:not(#custom-print-area) {
       display: none !important;
     }
+
+    /* Показываем только нашу чистую таблицу для печати */
+    #custom-print-area {
+      display: block !important;
+      width: 100%;
+      font-family: Arial, sans-serif;
+      color: #111827;
+      font-variant-numeric: tabular-nums;
+    }
+
+    #custom-print-area h2 {
+      font-size: 18px;
+      font-weight: bold;
+      margin: 0 0 12px 0;
+    }
+
+    #custom-print-area table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    #custom-print-area th,
+    #custom-print-area td {
+      border: 1px solid #9ca3af;
+      padding: 7px 10px;
+      vertical-align: middle;
+    }
+
+    #custom-print-area th {
+      background-color: #f3f4f6 !important;
+      font-weight: bold;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    /* Левая часть (Текст) */
+    .col-num { width: 35px; text-align: center; }
+    .col-code { width: 90px; text-align: center; font-family: monospace; font-weight: bold; }
+    .col-title { text-align: left; }
+
+    /* Правая часть (Цифры) — отделена толстой вертикальной линией */
+    .col-qty { width: 70px; text-align: right; border-left: 2px solid #4b5563 !important; }
+    .col-mult { width: 70px; text-align: right; }
+    .col-total { width: 85px; text-align: right; font-weight: bold; }
   }
 </style>
+
+
+
+
 </head>
 <body class="bg-stone-100 text-stone-800 min-h-screen p-4 md:p-8 lg:p-12">
 
@@ -71,40 +106,116 @@
     <main id="dashboard-container" class="space-y-6"></main>
 
   </div>
-  <script>
+<script>
   document.addEventListener('click', (e) => {
-    // Ищем кнопку печати, по которой кликнули
     const printBtn = e.target.closest('button[id^="print-"][id$="-table"]');
     if (!printBtn) return;
 
-    // Останавливаем стандартный вызов пустой печати из script.js
     e.stopImmediatePropagation();
 
-    // Находим карточку/секцию, внутри которой лежит эта кнопка и её таблица
     const section = printBtn.closest('section') 
                  || printBtn.closest('.bg-white') 
                  || printBtn.closest('div[id]');
 
-    if (!section) {
-      alert('Не удалось определить секцию для печати.');
+    if (!section) return;
+
+    const headerTitle = section.querySelector('h2, h3')?.innerText?.trim() || 'Список позиций';
+
+    // Находим все input в секции и поднимаемся от каждого до полной карточки товара
+    const inputs = Array.from(section.querySelectorAll('input'));
+    const rowSet = new Set();
+
+    inputs.forEach(inp => {
+      let el = inp;
+      let candidate = null;
+      // Поднимаемся вверх до самой секции и запоминаем самый верхний блок-строку (где ровно 2 инпута)
+      while (el && el !== section) {
+        if (el.querySelectorAll('input').length === 2) {
+          candidate = el;
+        }
+        el = el.parentElement;
+      }
+      if (candidate) rowSet.add(candidate);
+    });
+
+    const rows = Array.from(rowSet);
+    if (rows.length === 0) {
+      alert('В этой секции нет данных для печати.');
       return;
     }
 
-    // Убираем класс печати со всех элементов и вешаем на выбранную секцию
-    document.querySelectorAll('.only-print-section').forEach(el => {
-      el.classList.remove('only-print-section');
+    let tableRowsHtml = '';
+
+    rows.forEach((row, index) => {
+      const rowInputs = row.querySelectorAll('input');
+      const qty = rowInputs[0] ? rowInputs[0].value : '1';
+      const mult = rowInputs[1] ? rowInputs[1].value : '100';
+      const total = (Number(qty) * Number(mult)) || 0;
+
+      // Клонируем всю карточку целиком и удаляем кнопки, инпуты и иконки
+      const clone = row.cloneNode(true);
+      clone.querySelectorAll('button, input, svg').forEach(el => el.remove());
+
+      // Собираем все текстовые куски внутри карточки в массив
+      const textParts = [];
+      const walker = document.createTreeWalker(clone, NodeFilter.SHOW_TEXT, null, false);
+      let node;
+      while ((node = walker.nextNode())) {
+        const txt = node.nodeValue.replace(/[⋮⋮⠿×x*=]/g, '').trim();
+        // Игнорируем пустые строки, порядковый номер в начале и итоговую сумму в конце
+        if (txt && txt !== String(index + 1) && txt !== String(total)) {
+          textParts.push(txt);
+        }
+      }
+
+      // Первый текстовый кусок — это Код (например, 722007), остальное — Название товара
+      const code = textParts.length > 1 ? textParts[0] : '';
+      const title = textParts.length > 1 ? textParts.slice(1).join(' ') : (textParts[0] || '');
+
+      tableRowsHtml += `
+        <tr>
+          <td class="col-num">${index + 1}</td>
+          <td class="col-code">${code}</td>
+          <td class="col-title">${title}</td>
+          <td class="col-qty">${qty}</td>
+          <td class="col-mult">${mult}</td>
+          <td class="col-total">${total}</td>
+        </tr>
+      `;
     });
-    section.classList.add('only-print-section');
 
-    // Запускаем печать
+    let printArea = document.getElementById('custom-print-area');
+    if (!printArea) {
+      printArea = document.createElement('div');
+      printArea.id = 'custom-print-area';
+      document.body.appendChild(printArea);
+    }
+
+    printArea.innerHTML = `
+      <h2>${headerTitle}</h2>
+      <table>
+        <thead>
+          <tr>
+            <th class="col-num">№</th>
+            <th class="col-code">Код</th>
+            <th class="col-title">Название товара</th>
+            <th class="col-qty">Кол-во</th>
+            <th class="col-mult">Множ.</th>
+            <th class="col-total">Итого</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${tableRowsHtml}
+        </tbody>
+      </table>
+    `;
+
     window.print();
-
-    // Очищаем класс после печати
-    setTimeout(() => {
-      section.classList.remove('only-print-section');
-    }, 500);
-  }, true); // true перехватывает клик раньше, чем сработает script.js
+  }, true);
 </script>
+
+
+
 
 <!-- Подключаем Supabase клиент через CDN -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
