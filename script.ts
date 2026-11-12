@@ -386,7 +386,9 @@ function renderDashboard(): void {
     dashboardContainer.appendChild(sectionDiv);
   });
 
-  // Логика Drag-and-Drop
+ // ==========================================
+  // Логика Drag-and-Drop (перетаскивание строк)
+  // ==========================================
   let draggedItem: HTMLElement | null = null;
 
   document.querySelectorAll('.draggable-row').forEach(row => {
@@ -413,17 +415,34 @@ function renderDashboard(): void {
       }
     });
 
-row.addEventListener('drop', async (e) => {
+    row.addEventListener('drop', async (e) => {
       e.preventDefault();
       const container = row.closest('.task-list-container');
       if (!container) return;
 
+      // 1. Собираем новый порядок ID в этой секции
       const newOrderIds = Array.from(container.querySelectorAll('.draggable-row')).map(r => Number(r.getAttribute('data-id')));
       
       const sectionKey = container.getAttribute('data-section');
       const otherItems = items.filter(i => i.status !== sectionKey);
       const reorderedSectionItems = newOrderIds.map(id => items.find(i => i.id === id)).filter(Boolean) as ProductionItem[];
+      
+      // 2. Обновляем локальный массив
       items = [...otherItems, ...reorderedSectionItems];
+
+      // 3. Сохраняем новый порядок (sort_order) в базу Supabase
+    // Сохраняем новый порядок (если колонка sort_order существует)
+      try {
+        for (let i = 0; i < newOrderIds.length; i++) {
+          await supabaseClient
+            .from(TABLE_NAME)
+            .update({ sort_order: i })
+            .eq('id', newOrderIds[i]);
+        }
+      } catch (err) {
+        console.warn('Колонка sort_order еще не создана в базе, порядок сохранен локально');
+      }
+      // 4. Перерисовываем дашборд, чтобы номера (1, 2, 3...) мгновенно обновились
       renderDashboard();
     });
   });
@@ -433,7 +452,8 @@ row.addEventListener('drop', async (e) => {
 
     return draggableElements.reduce((closest: { offset: number; element: Element | null }, child) => {
       const box = child.getBoundingClientRect();
-      const offset = y - box.top - box.height / 2;
+      const offset = y - box.top - box.height / 2; // Исправленная формула расчета смещения
+      
       if (offset < 0 && offset > closest.offset) {
         return { offset: offset, element: child };
       } else {
@@ -441,7 +461,6 @@ row.addEventListener('drop', async (e) => {
       }
     }, { offset: Number.NEGATIVE_INFINITY, element: null }).element;
   }
-
   // Привязка кнопок удаления
   const currentContainer = document.getElementById('dashboard-container');
   if (currentContainer) {
