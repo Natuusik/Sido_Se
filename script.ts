@@ -24,6 +24,7 @@ interface ProductionItem extends CatalogItem {
   status: 'ready' | 'process' | 'boxes';
   quantity?: number;
   multiplier?: number;
+  note?: string; // Поле для колонки пометок
 }
 
 const catalogDatabase: CatalogItem[] = [
@@ -42,7 +43,7 @@ const catalogDatabase: CatalogItem[] = [
   { code: "732008", title: "BXT Letter Portrait White", pdfUrl: "./docs/732008.pdf" },
 ];
 let items: ProductionItem[] = [];
-let lastUpdateTime: Date | null = null; // Общее время из базы для всех устройств
+let lastUpdateTime: Date | null = null;
 
 const dashboardContainer = document.getElementById('dashboard-container');
 
@@ -63,7 +64,6 @@ function renderHeaderDate(): void {
   dateContainer.innerText = today.charAt(0).toUpperCase() + today.slice(1);
 }
 
-// Вспомогательная функция для добавления ведущего нуля (работает везде без padStart)
 function pad(n: number): string {
   return n < 10 ? '0' + n : String(n);
 }
@@ -78,16 +78,13 @@ function renderLastUpdateTime(): void {
   }
 
   const d = lastUpdateTime as any;
-
   const day = pad(d.getDate());
   const month = pad(d.getMonth() + 1);
   const year = d.getFullYear();
-
   const hours = pad(d.getHours());
   const minutes = pad(d.getMinutes());
   const seconds = pad(d.getSeconds());
 
-  // Выводим полную дату и время (ДД.ММ.ГГГГ ЧЧ:ММ:СС)
   timeContainer.innerText = `Updated: ${day}.${month}.${year} ${hours}:${minutes}:${seconds}`;
 }
 
@@ -98,11 +95,10 @@ function formatTitle(title: string): string {
 }
 
 // ==========================================
-// 3. Работа с Supabase (Загрузка задач + Общее время)
+// 3. Работа с Supabase (Загрузка задач + Время)
 // ==========================================
 async function fetchItemsFromSupabase(): Promise<void> {
   try {
-    // 1. Загружаем задачи
     const { data: taskData, error: taskError } = await supabaseClient.from(TABLE_NAME).select('*');
     if (taskError) {
       console.error('Supabase tasks error:', taskError.message);
@@ -110,7 +106,6 @@ async function fetchItemsFromSupabase(): Promise<void> {
       items = taskData as ProductionItem[];
     }
 
-    // 2. Подгружаем последнее время из базы app_settings для всех устройств
     const { data: timeData, error: timeError } = await supabaseClient
       .from('app_settings')
       .select('last_update_time')
@@ -148,6 +143,42 @@ async function fetchItemsFromSupabase(): Promise<void> {
   } catch (err) {
     console.error('Ошибка в markAsReady:', err);
   }
+};
+
+// Функция редактирования карточки (Карандашик)
+(window as any).editItemModal = function(itemId: number) {
+  const item = items.find(i => i.id === itemId);
+  if (!item) return;
+
+  const newCode = prompt("Редактировать код товара:", item.code);
+  if (newCode === null) return; // Нажали отмену
+
+  const newTitle = prompt("Редактировать название товара:", item.title);
+  if (newTitle === null) return;
+
+  const trimmedCode = newCode.trim();
+  const trimmedTitle = newTitle.trim();
+
+  if (!trimmedCode || !trimmedTitle) {
+    alert("Код и название не могут быть пустыми!");
+    return;
+  }
+
+  // Обновляем локально и в базе
+  item.code = trimmedCode;
+  item.title = trimmedTitle;
+  item.pdfUrl = `./docs/${trimmedCode}.pdf`;
+
+  supabaseClient.from(TABLE_NAME)
+    .update({ code: trimmedCode, title: trimmedTitle, pdfUrl: item.pdfUrl })
+    .eq('id', itemId)
+    .then(({ error }: { error: any }) => {
+      if (error) {
+        console.error("Ошибка обновления:", error);
+        alert("Не удалось сохранить изменения в базе.");
+      }
+      renderDashboard();
+    });
 };
 
 // ==========================================
@@ -188,7 +219,6 @@ function renderDashboard(): void {
   `;
   dashboardContainer.appendChild(addFormContainer);
 
-  // Автосвязка полей Кода и Названия
   const codeInput = document.getElementById('product-code') as HTMLInputElement;
   const titleInput = document.getElementById('product-title') as HTMLInputElement;
 
@@ -204,12 +234,10 @@ function renderDashboard(): void {
     });
   }
 
-  // Обработчик отправки формы добавления
   const addItemForm = document.getElementById('add-item-form') as HTMLFormElement;
   if (addItemForm) {
     addItemForm.addEventListener('submit', async (e) => {
       e.preventDefault();
-      
       const cInput = document.getElementById('product-code') as HTMLInputElement;
       const tInput = document.getElementById('product-title') as HTMLInputElement;
 
@@ -225,7 +253,8 @@ function renderDashboard(): void {
         status: 'process' as const,
         pdfUrl: `./docs/${code}.pdf`,
         quantity: 1,
-        multiplier: 100
+        multiplier: 100,
+        note: ''
       };
 
       const { error } = await supabaseClient.from(TABLE_NAME).insert([newItem]);
@@ -240,7 +269,6 @@ function renderDashboard(): void {
     });
   }
 
-  // Секции (Completed Goods и In Progress)
   const targetSections = [
     { 
       key: 'ready', 
@@ -308,6 +336,14 @@ function renderDashboard(): void {
         const currentQty = item.quantity ?? 1;
         const currentMultiplier = item.multiplier ?? 100;
         const rowTotal = currentQty * currentMultiplier;
+        const currentNote = item.note ?? '';
+
+        // Колонка пометки добавляется ТОЛЬКО для In Progress (process)
+        const noteColumnHtml = section.key === 'process' 
+          ? `<div class="w-full xl:w-40 shrink-0">
+               <input type="text" value="${currentNote}" data-id="${item.id}" data-field="note" placeholder="Note..." class="item-note-input w-full bg-stone-50 border border-stone-300 rounded-xl px-2.5 py-1.5 text-xs text-stone-800 focus:outline-none focus:border-blue-500 font-sans" />
+             </div>`
+          : '';
 
         tableContent += `
           <div draggable="true" data-id="${item.id}" class="draggable-row flex flex-col xl:flex-row items-start xl:items-center justify-between p-4 bg-white rounded-2xl border border-stone-200/80 border-l-4 ${borderAccentClass} shadow-sm transition-all hover:shadow-md gap-4 cursor-grab active:cursor-grabbing">
@@ -324,6 +360,8 @@ function renderDashboard(): void {
             </div>
 
             <div class="flex flex-wrap items-center justify-between xl:justify-end gap-3 w-full xl:w-auto pt-3 xl:pt-0 border-t xl:border-t-0 border-stone-100 shrink-0">
+              ${noteColumnHtml}
+
               <div class="flex items-center space-x-1.5 bg-stone-50 px-3 py-1.5 rounded-xl border border-stone-200">
                 <input type="number" min="1" value="${currentQty}" data-id="${item.id}" data-field="quantity" class="item-calc-input w-12 text-center bg-white border border-stone-300 rounded-lg text-xs py-1 focus:outline-none focus:border-blue-500 font-mono font-bold" />
                 <span class="text-xs font-semibold text-stone-500">×</span>
@@ -333,6 +371,7 @@ function renderDashboard(): void {
 
               <div class="flex items-center space-x-2 no-print">
                 ${actionButton}
+                <button onclick="editItemModal(${item.id})" class="bg-stone-50 hover:bg-amber-50 text-stone-400 hover:text-amber-600 border border-stone-200 p-2 rounded-xl text-xs transition-colors shadow-xs" title="Edit item">✏️</button>
                 <button class="delete-btn bg-stone-50 hover:bg-rose-50 text-stone-400 hover:text-rose-600 border border-stone-200 p-2 rounded-xl text-xs transition-colors shadow-xs" data-id="${item.id}" title="Delete item">🗑️</button>
               </div>
             </div>
@@ -347,7 +386,7 @@ function renderDashboard(): void {
     dashboardContainer.appendChild(sectionDiv);
   });
 
-  // Логика Drag-and-Drop (перетаскивание строк)
+  // Логика Drag-and-Drop
   let draggedItem: HTMLElement | null = null;
 
   document.querySelectorAll('.draggable-row').forEach(row => {
@@ -374,7 +413,7 @@ function renderDashboard(): void {
       }
     });
 
-    row.addEventListener('drop', async (e) => {
+row.addEventListener('drop', async (e) => {
       e.preventDefault();
       const container = row.closest('.task-list-container');
       if (!container) return;
@@ -384,8 +423,8 @@ function renderDashboard(): void {
       const sectionKey = container.getAttribute('data-section');
       const otherItems = items.filter(i => i.status !== sectionKey);
       const reorderedSectionItems = newOrderIds.map(id => items.find(i => i.id === id)).filter(Boolean) as ProductionItem[];
-
       items = [...otherItems, ...reorderedSectionItems];
+      renderDashboard();
     });
   });
 
@@ -421,98 +460,6 @@ function renderDashboard(): void {
     });
   }
 
-  // Привязка кнопок печати и копирования в Word
- // Привязка кнопок печати и копирования в Word
-targetSections.forEach(section => {
-  const printBtn = document.getElementById(`print-${section.key}-table`);
-  if (printBtn) {
-    printBtn.addEventListener('click', () => {
-      // Находим блок секции (ищем по ID секции или берем ближайший родительский блок/секцию)
-      const sectionEl = document.getElementById(`section-${section.key}`) 
-                     || document.getElementById(section.key) 
-                     || printBtn.closest('section, .card, .section-container, div');
-
-      // Очищаем класс печати у всех остальных элементов на всякий случай
-      document.querySelectorAll('.only-print-section').forEach(el => {
-        el.classList.remove('only-print-section');
-      });
-
-      if (sectionEl) {
-        // Добавляем класс, который разрешает отображение при печати
-        sectionEl.classList.add('only-print-section');
-
-        // Запускаем печать
-        window.print();
-
-        // Убираем класс после закрытия окна печати (с небольшой задержкой для надежности)
-        setTimeout(() => {
-          sectionEl.classList.remove('only-print-section');
-        }, 500);
-      } else {
-        alert('Не удалось найти блок секции для печати.');
-      }
-    });
-  }
-
-  const copyBtn = document.getElementById(`copy-${section.key}-table`);
-  if (copyBtn) {
-    copyBtn.addEventListener('click', () => {
-      const groupItems = items.filter(item => item.status === section.key);
-      if (groupItems.length === 0) {
-        alert('В этой секции нет данных для копирования.');
-        return;
-      }
-
-      let htmlTable = `
-        <table border="1" cellspacing="0" cellpadding="5" style="border-collapse: collapse; font-family: Arial, sans-serif; font-size: 14px; width: 100%;">
-          <thead>
-            <tr style="background-color: #f3f4f6; text-align: left;">
-              <th style="padding: 8px; border: 1px solid #d1d5db;">№</th>
-              <th style="padding: 8px; border: 1px solid #d1d5db;">Код</th>
-              <th style="padding: 8px; border: 1px solid #d1d5db;">Название товара</th>
-              <th style="padding: 8px; border: 1px solid #d1d5db; text-align: center;">Количество</th>
-              <th style="padding: 8px; border: 1px solid #d1d5db; text-align: center;">Множитель</th>
-              <th style="padding: 8px; border: 1px solid #d1d5db; text-align: right;">Итого</th>
-            </tr>
-          </thead>
-          <tbody>
-      `;
-
-      groupItems.forEach((item, index) => {
-        const qty = item.quantity ?? 1;
-        const mult = item.multiplier ?? 100;
-        const total = qty * mult; // Исправлен знак умножения
-
-        htmlTable += `
-          <tr>
-            <td style="padding: 8px; border: 1px solid #d1d5db; text-align: center;">${index + 1}</td>
-            <td style="padding: 8px; border: 1px solid #d1d5db; font-family: monospace; font-weight: bold;">${item.code}</td>
-            <td style="padding: 8px; border: 1px solid #d1d5db;">${item.title}</td>
-            <td style="padding: 8px; border: 1px solid #d1d5db; text-align: center;">${qty}</td>
-            <td style="padding: 8px; border: 1px solid #d1d5db; text-align: center;">${mult}</td>
-            <td style="padding: 8px; border: 1px solid #d1d5db; text-align: right; font-weight: bold;">${total}</td>
-          </tr>
-        `;
-      });
-
-      htmlTable += `</tbody></table>`;
-
-      const clipboardItem = new ClipboardItem({
-        "text/html": new Blob([htmlTable], { type: "text/html" }),
-        "text/plain": new Blob([htmlTable.replace(/<[^>]*>?/gm, '')], { type: "text/plain" })
-      });
-
-      navigator.clipboard.write([clipboardItem]).then(() => {
-        alert(`Таблица секции "${section.title}" успешно скопирована! Вставьте в Word (Ctrl + V).`);
-      }).catch(err => {
-        console.error('Ошибка копирования:', err);
-        alert('Не удалось скопировать таблицу.');
-      });
-    });
-  }
-});
-
-
   // Привязка инпутов калькулятора
   document.querySelectorAll('.item-calc-input').forEach(input => {
     input.addEventListener('change', async (e) => {
@@ -537,6 +484,26 @@ targetSections.forEach(section => {
       renderDashboard();
     });
   });
+
+  // Привязка инпутов пометок (Note)
+  document.querySelectorAll('.item-note-input').forEach(input => {
+    input.addEventListener('change', async (e) => {
+      const target = e.target as HTMLInputElement;
+      const id = Number(target.getAttribute('data-id'));
+      const val = target.value;
+
+      const targetItem: any = items.find(i => i.id === id);
+      if (targetItem) {
+        targetItem.note = val;
+      }
+
+      try {
+        await supabaseClient.from(TABLE_NAME).update({ note: val }).eq('id', id);
+      } catch (err) {
+        console.error('Error updating note in Supabase:', err);
+      }
+    });
+  });
 }
 
 // ==========================================
@@ -552,7 +519,6 @@ async function handleRefreshClick(): Promise<void> {
   const now = new Date();
 
   try {
-    // 1. Отправляем точную дату и время в таблицу app_settings в Supabase
     const { error } = await supabaseClient
       .from('app_settings')
       .update({ last_update_time: now.toISOString() })
@@ -560,14 +526,11 @@ async function handleRefreshClick(): Promise<void> {
 
     if (error) {
       console.error('Ошибка сохранения времени в базу:', error);
-      alert('Не удалось обновить время в базе. Проверьте консоль (F12).');
     } else {
-      // 2. Обновляем локально и выводим на экран
       lastUpdateTime = now;
       renderLastUpdateTime();
     }
 
-    // 3. Подгружаем актуальные данные задач
     const { data: taskData, error: taskError } = await supabaseClient.from(TABLE_NAME).select('*');
     if (taskError) {
       console.error('Ошибка загрузки задач:', taskError.message);
@@ -586,7 +549,6 @@ async function handleRefreshClick(): Promise<void> {
   }
 }
 
-// Привязываем клик к кнопке
 if (refreshButton) {
   refreshButton.addEventListener('click', handleRefreshClick);
 }

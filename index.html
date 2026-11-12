@@ -8,7 +8,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
 <style>
 
-    /* Настройки для мобильной версии (экраны до 640px) */
+  /* Настройки для мобильной версии (экраны до 640px) */
   @media (max-width: 640px) {
     /* Находим верхнюю строку карточки, где лежат номер, код и название, и разрешаем перенос */
     #dashboard-container [class*="rounded-2xl"][class*="border"] > div:first-child,
@@ -90,10 +90,6 @@
     .col-total { width: 85px; text-align: right; font-weight: bold; }
   }
 </style>
-
-
-
-
 </head>
 <body class="bg-stone-100 text-stone-800 min-h-screen p-4 md:p-8 lg:p-12">
 
@@ -101,145 +97,231 @@
   <div class="max-w-6xl mx-auto space-y-6">
 
     <!-- Шапка дашборда -->
-<header class="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 md:p-8 rounded-3xl border border-stone-200/80 shadow-sm">
-  <div>
-    <h1 class="text-2xl md:text-3xl font-black text-stone-900 tracking-tight">ERP Dashboard</h1>
-    <p class="text-xs md:text-sm text-stone-500 mt-1">Production & Order Management</p>
-  </div>
-  
-  <div class="flex items-center flex-wrap gap-3 w-full sm:w-auto justify-between sm:justify-end">
-    <!-- Дата -->
-    <div id="current-date" class="text-xs md:text-sm font-semibold text-stone-700 bg-stone-50 px-4 py-2.5 rounded-2xl border border-stone-200 shadow-inner">
-    </div>
-    
-    <!-- Время последнего обновления (сюда JS подставит текст из script.js) -->
-    <div id="last-update-time" class="text-xs md:text-sm font-semibold text-stone-600 bg-stone-50 px-4 py-2.5 rounded-2xl border border-stone-200">
-      Updated: ---
-    </div>
+    <header class="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 md:p-8 rounded-3xl border border-stone-200/80 shadow-sm">
+      <div>
+        <h1 class="text-2xl md:text-3xl font-black text-stone-900 tracking-tight">ERP Dashboard</h1>
+        <p class="text-xs md:text-sm text-stone-500 mt-1">Production & Order Management</p>
+      </div>
+      
+      <div class="flex items-center flex-wrap gap-3 w-full sm:w-auto justify-between sm:justify-end">
+        <!-- Дата -->
+        <div id="current-date" class="text-xs md:text-sm font-semibold text-stone-700 bg-stone-50 px-4 py-2.5 rounded-2xl border border-stone-200 shadow-inner">
+        </div>
+        
+        <!-- Время последнего обновления -->
+        <div id="last-update-time" class="text-xs md:text-sm font-semibold text-stone-600 bg-stone-50 px-4 py-2.5 rounded-2xl border border-stone-200">
+          Updated: ---
+        </div>
 
-    <!-- Кнопка обновления -->
-    <button id="refresh-btn" class="bg-blue-600 hover:bg-blue-700 text-white text-xs md:text-sm font-medium px-4 py-2.5 rounded-2xl transition-colors shadow-sm flex items-center space-x-1.5 cursor-pointer">
-      <span>🔄 Refresh</span>
-    </button>
-  </div>
-</header>
+        <!-- Кнопка обновления -->
+        <button id="refresh-btn" class="bg-blue-600 hover:bg-blue-700 text-white text-xs md:text-sm font-medium px-4 py-2.5 rounded-2xl transition-colors shadow-sm flex items-center space-x-1.5 cursor-pointer">
+          <span>🔄 Refresh</span>
+        </button>
+      </div>
+    </header>
 
     <!-- Основное содержимое (таблицы, карточки, формы) -->
     <main id="dashboard-container" class="space-y-6"></main>
 
   </div>
+
 <script>
-  document.addEventListener('click', (e) => {
+  document.addEventListener('click', async (e) => {
+    // 1. Обработка кнопки ПЕЧАТИ (Print / PDF)
     const printBtn = e.target.closest('button[id^="print-"][id$="-table"]');
-    if (!printBtn) return;
+    if (printBtn) {
+      e.stopImmediatePropagation();
+      const section = printBtn.closest('section') || printBtn.closest('.bg-white') || printBtn.closest('div[id]');
+      if (!section) return;
 
-    e.stopImmediatePropagation();
-
-    const section = printBtn.closest('section') 
-                 || printBtn.closest('.bg-white') 
-                 || printBtn.closest('div[id]');
-
-    if (!section) return;
-
-    const headerTitle = section.querySelector('h2, h3')?.innerText?.trim() || 'Список позиций';
-
-    // Находим все input в секции и поднимаемся от каждого до полной карточки товара
-    const inputs = Array.from(section.querySelectorAll('input'));
-    const rowSet = new Set();
-
-    inputs.forEach(inp => {
-      let el = inp;
-      let candidate = null;
-      // Поднимаемся вверх до самой секции и запоминаем самый верхний блок-строку (где ровно 2 инпута)
-      while (el && el !== section) {
-        if (el.querySelectorAll('input').length === 2) {
-          candidate = el;
-        }
-        el = el.parentElement;
+      const sectionId = section.id || '';
+      let headerTitle = 'Production Items';
+      if (sectionId.includes('ready')) {
+        headerTitle = 'Completed Goods';
+      } else if (sectionId.includes('process')) {
+        headerTitle = 'In Progress';
       }
-      if (candidate) rowSet.add(candidate);
-    });
 
-    const rows = Array.from(rowSet);
-    if (rows.length === 0) {
-      alert('В этой секции нет данных для печати.');
+      const rows = Array.from(section.querySelectorAll('.draggable-row'));
+      if (rows.length === 0) {
+        alert('No data available in this section to print.');
+        return;
+      }
+
+      let tableRowsHtml = '';
+      rows.forEach((row, index) => {
+        const calcInputs = row.querySelectorAll('.item-calc-input');
+        const qty = calcInputs[0] ? calcInputs[0].value : '1';
+        const mult = calcInputs[1] ? calcInputs[1].value : '100';
+        const total = (Number(qty) * Number(mult)) || 0;
+
+        const clone = row.cloneNode(true);
+        clone.querySelectorAll('button, input, svg').forEach(el => el.remove());
+
+        const textParts = [];
+        const walker = document.createTreeWalker(clone, NodeFilter.SHOW_TEXT, null, false);
+        let node;
+        while ((node = walker.nextNode())) {
+          const txt = node.nodeValue.replace(/[⋮⋮⠿×x*=]/g, '').trim();
+          if (txt && txt !== String(index + 1) && txt !== String(total)) {
+            textParts.push(txt);
+          }
+        }
+
+        const code = textParts.length > 1 ? textParts[0] : '';
+        const title = textParts.length > 1 ? textParts.slice(1).join(' ') : (textParts[0] || '');
+
+        tableRowsHtml += `
+          <tr>
+            <td class="col-num">${index + 1}</td>
+            <td class="col-code">${code}</td>
+            <td class="col-title">${title}</td>
+            <td class="col-qty">${qty}</td>
+            <td class="col-mult">${mult}</td>
+            <td class="col-total">${total}</td>
+          </tr>
+        `;
+      });
+
+      let printArea = document.getElementById('custom-print-area');
+      if (!printArea) {
+        printArea = document.createElement('div');
+        printArea.id = 'custom-print-area';
+        document.body.appendChild(printArea);
+      }
+
+      printArea.innerHTML = `
+        <h2>${headerTitle}</h2>
+        <table>
+          <thead>
+            <tr>
+              <th class="col-num">№</th>
+              <th class="col-code">Code</th>
+              <th class="col-title">Product Title</th>
+              <th class="col-qty">Qty</th>
+              <th class="col-mult">Mult.</th>
+              <th class="col-total">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${tableRowsHtml}
+          </tbody>
+        </table>
+      `;
+
+      window.print();
       return;
     }
 
-    let tableRowsHtml = '';
+    // 2. Обработка кнопки КОПИРОВАНИЯ В WORD (To Word)
+    const copyBtn = e.target.closest('button[id^="copy-"][id$="-table"]');
+    if (copyBtn) {
+      e.stopImmediatePropagation();
+      const section = copyBtn.closest('section') || copyBtn.closest('.bg-white') || copyBtn.closest('div[id]');
+      if (!section) return;
 
-    rows.forEach((row, index) => {
-      const rowInputs = row.querySelectorAll('input');
-      const qty = rowInputs[0] ? rowInputs[0].value : '1';
-      const mult = rowInputs[1] ? rowInputs[1].value : '100';
-      const total = (Number(qty) * Number(mult)) || 0;
-
-      // Клонируем всю карточку целиком и удаляем кнопки, инпуты и иконки
-      const clone = row.cloneNode(true);
-      clone.querySelectorAll('button, input, svg').forEach(el => el.remove());
-
-      // Собираем все текстовые куски внутри карточки в массив
-      const textParts = [];
-      const walker = document.createTreeWalker(clone, NodeFilter.SHOW_TEXT, null, false);
-      let node;
-      while ((node = walker.nextNode())) {
-        const txt = node.nodeValue.replace(/[⋮⋮⠿×x*=]/g, '').trim();
-        // Игнорируем пустые строки, порядковый номер в начале и итоговую сумму в конце
-        if (txt && txt !== String(index + 1) && txt !== String(total)) {
-          textParts.push(txt);
-        }
+      const sectionId = section.id || '';
+      let sectionTitle = 'Production Items';
+      if (sectionId.includes('ready')) {
+        sectionTitle = 'Completed Goods';
+      } else if (sectionId.includes('process')) {
+        sectionTitle = 'In Progress';
       }
 
-      // Первый текстовый кусок — это Код (например, 722007), остальное — Название товара
-      const code = textParts.length > 1 ? textParts[0] : '';
-      const title = textParts.length > 1 ? textParts.slice(1).join(' ') : (textParts[0] || '');
+      // Достаем данные прямо из карточек на экране
+      const rows = Array.from(section.querySelectorAll('.draggable-row'));
+      if (rows.length === 0) {
+        alert('No data available in this section to copy.');
+        return;
+      }
 
-      tableRowsHtml += `
-        <tr>
-          <td class="col-num">${index + 1}</td>
-          <td class="col-code">${code}</td>
-          <td class="col-title">${title}</td>
-          <td class="col-qty">${qty}</td>
-          <td class="col-mult">${mult}</td>
-          <td class="col-total">${total}</td>
-        </tr>
+      let htmlTable = `
+        <table border="1" cellspacing="0" cellpadding="5" style="border-collapse: collapse; font-family: Arial, sans-serif; font-size: 14px; width: 100%;">
+          <thead>
+            <tr style="background-color: #f3f4f6; text-align: left;">
+              <th style="padding: 8px; border: 1px solid #d1d5db;">№</th>
+              <th style="padding: 8px; border: 1px solid #d1d5db;">Code</th>
+              <th style="padding: 8px; border: 1px solid #d1d5db;">Product Title</th>
+              <th style="padding: 8px; border: 1px solid #d1d5db; text-align: center;">Qty</th>
+              <th style="padding: 8px; border: 1px solid #d1d5db; text-align: center;">Multiplier</th>
+              <th style="padding: 8px; border: 1px solid #d1d5db; text-align: right;">Total</th>
+            </tr>
+          </thead>
+          <tbody>
       `;
-    });
 
-    let printArea = document.getElementById('custom-print-area');
-    if (!printArea) {
-      printArea = document.createElement('div');
-      printArea.id = 'custom-print-area';
-      document.body.appendChild(printArea);
-    }
+      rows.forEach((row, index) => {
+        const calcInputs = row.querySelectorAll('.item-calc-input');
+        const qty = calcInputs[0] ? calcInputs[0].value : '1';
+        const mult = calcInputs[1] ? calcInputs[1].value : '100';
+        const total = (Number(qty) * Number(mult)) || 0;
 
-    printArea.innerHTML = `
-      <h2>${headerTitle}</h2>
-      <table>
-        <thead>
+        const clone = row.cloneNode(true);
+        clone.querySelectorAll('button, input, svg').forEach(el => el.remove());
+
+        const textParts = [];
+        const walker = document.createTreeWalker(clone, NodeFilter.SHOW_TEXT, null, false);
+        let node;
+        while ((node = walker.nextNode())) {
+          const txt = node.nodeValue.replace(/[⋮⋮⠿×x*=]/g, '').trim();
+          if (txt && txt !== String(index + 1) && txt !== String(total)) {
+            textParts.push(txt);
+          }
+        }
+
+        const code = textParts.length > 1 ? textParts.slice(0, 1).join('') : '';
+        const title = textParts.length > 1 ? textParts.slice(1).join(' ') : (textParts[0] || '');
+
+        htmlTable += `
           <tr>
-            <th class="col-num">№</th>
-            <th class="col-code">Код</th>
-            <th class="col-title">Название товара</th>
-            <th class="col-qty">Кол-во</th>
-            <th class="col-mult">Множ.</th>
-            <th class="col-total">Итого</th>
+            <td style="padding: 8px; border: 1px solid #d1d5db; text-align: center;">${index + 1}</td>
+            <td style="padding: 8px; border: 1px solid #d1d5db; font-family: monospace; font-weight: bold;">${code}</td>
+            <td style="padding: 8px; border: 1px solid #d1d5db;">${title}</td>
+            <td style="padding: 8px; border: 1px solid #d1d5db; text-align: center;">${qty}</td>
+            <td style="padding: 8px; border: 1px solid #d1d5db; text-align: center;">${mult}</td>
+            <td style="padding: 8px; border: 1px solid #d1d5db; text-align: right; font-weight: bold;">${total}</td>
           </tr>
-        </thead>
-        <tbody>
-          ${tableRowsHtml}
-        </tbody>
-      </table>
-    `;
+        `;
+      });
 
-    window.print();
-  }, true);
+      htmlTable += `</tbody></table>`;
+
+      try {
+        const clipboardItem = new ClipboardItem({
+          "text/html": new Blob([htmlTable], { type: "text/html" }),
+          "text/plain": new Blob([htmlTable.replace(/<[^>]*>?/gm, '')], { type: "text/plain" })
+        });
+        await navigator.clipboard.write([clipboardItem]);
+        alert(`Table for "${sectionTitle}" successfully copied! Paste into Word (Ctrl + V).`);
+      } catch (err) {
+        console.warn('ClipboardItem error, trying fallback...', err);
+        try {
+          const tempDiv = document.createElement('div');
+          tempDiv.innerHTML = htmlTable;
+          tempDiv.style.position = 'fixed';
+          tempDiv.style.left = '-9999px';
+          document.body.appendChild(tempDiv);
+          
+          const range = document.createRange();
+          range.selectNode(tempDiv);
+          const selection = window.getSelection();
+          if (selection) {
+            selection.removeAllRanges();
+            selection.addRange(range);
+            document.execCommand('copy');
+            selection.removeAllRanges();
+          }
+          document.body.removeChild(tempDiv);
+          alert(`Table for "${sectionTitle}" copied! Paste into Word.`);
+        } catch (fallbackErr) {
+          console.error('All copy methods failed:', fallbackErr);
+          alert('Failed to copy. Check browser permissions.');
+        }
+      }
+    }
+  });
 </script>
-
-
-
-
-<!-- Подключаем Supabase клиент через CDN -->
+  <!-- Подключаем Supabase клиент через CDN -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <!-- Подключаем скомпилированный скрипт -->
   <script src="script.js"></script>
