@@ -351,24 +351,26 @@ function renderDashboard() {
         sectionDiv.innerHTML = tableContent;
         dashboardContainer.appendChild(sectionDiv);
     });
-    // Инициализация Drag-and-Drop через SortableJS
+    /// Инициализация Drag-and-Drop через SortableJS (тянем за иконку ⠿)
     document.querySelectorAll('.task-list-container').forEach(container => {
         const sectionKey = container.getAttribute('data-section');
         window.Sortable.create(container, {
             animation: 150,
+            handle: '.drag-handle', // Перетаскивание происходит строго за иконку ⠿
             ghostClass: 'opacity-45',
-            touchAction: 'pan-y', // Позволяет скроллить страницу пальцем
-            delay: 150, // Задержка для мобильных, чтобы отличать скролл от переноса
-            delayOnTouchOnly: true, // На ПК работает мгновенно без задержек
+            touchAction: 'pan-y', // Позволяет свободно скроллить страницу пальцем
             onEnd: function () {
                 return __awaiter(this, void 0, void 0, function* () {
+                    // 1. Собираем новый порядок ID в этой секции
                     const newOrderIds = Array.from(container.querySelectorAll('.draggable-row'))
                         .map(r => Number(r.getAttribute('data-id')));
                     const otherItems = items.filter(i => i.status !== sectionKey);
                     const reorderedSectionItems = newOrderIds
                         .map(id => items.find(i => i.id === id))
                         .filter(Boolean);
+                    // 2. Обновляем локальный массив
                     items = [...otherItems, ...reorderedSectionItems];
+                    // 3. Сохраняем новый порядок (sort_order) в базу Supabase
                     try {
                         for (let i = 0; i < newOrderIds.length; i++) {
                             yield supabaseClient
@@ -378,8 +380,9 @@ function renderDashboard() {
                         }
                     }
                     catch (err) {
-                        console.warn('Ошибка сохранения порядка:', err);
+                        console.warn('Ошибка сохранения порядка в базу:', err);
                     }
+                    // 4. Перерисовываем дашборд
                     renderDashboard();
                 });
             }
