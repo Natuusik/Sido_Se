@@ -39,7 +39,8 @@ const catalogDatabase = [
     { code: "732021", title: "BXT 305x305 Square White", pdfUrl: "./docs/732021.pdf" },
     { code: "732024", title: "BXT Letter Portrait Black", pdfUrl: "./docs/732024.pdf" },
     { code: "732048", title: "BXT Black Special Endsheet 295 x 210 Landscape NSM", pdfUrl: "./docs/732048.pdf" },
-    { code: "732054", title: "BXT End sheet white 254 x 254 mm Square", pdfUrl: "./docs/732054.pdf" },
+    { code: "732053", title: "BXT End sheet white 254 x 254 mm Square White", pdfUrl: "./docs/732053.pdf" },
+    { code: "732054", title: "BXT End sheet white 254 x 254 mm Square Black", pdfUrl: "./docs/732054.pdf" },
 ];
 let items = [];
 let lastUpdateTime = null;
@@ -383,10 +384,75 @@ function renderDashboard() {
         sectionDiv.innerHTML = tableContent;
         dashboardContainer.appendChild(sectionDiv);
     });
-}
-// ==========================================
-// Функции управления порядком (стрелочки)
-// ==========================================
+    // 1. Привязка инпутов калькулятора (ВНУТРИ renderDashboard!)
+    document.querySelectorAll('.item-calc-input').forEach(input => {
+        input.addEventListener('change', (e) => __awaiter(this, void 0, void 0, function* () {
+            const target = e.target;
+            const id = Number(target.getAttribute('data-id'));
+            const field = target.getAttribute('data-field');
+            const val = Number(target.value) || 0;
+            const targetItem = items.find(i => i.id === id);
+            if (targetItem && field) {
+                targetItem[field] = val;
+            }
+            try {
+                const updateObj = {};
+                updateObj[field] = val;
+                yield supabaseClient.from(TABLE_NAME).update(updateObj).eq('id', id);
+            }
+            catch (err) {
+                console.error('Error updating in Supabase:', err);
+            }
+            renderDashboard();
+        }));
+    });
+    // 2. Привязка инпутов пометок (Note) (ВНУТРИ renderDashboard!)
+    document.querySelectorAll('.item-note-input').forEach(input => {
+        input.addEventListener('change', (e) => __awaiter(this, void 0, void 0, function* () {
+            const target = e.target;
+            const id = Number(target.getAttribute('data-id'));
+            const val = target.value;
+            const targetItem = items.find(i => i.id === id);
+            if (targetItem) {
+                targetItem.note = val;
+            }
+            try {
+                yield supabaseClient.from(TABLE_NAME).update({ note: val }).eq('id', id);
+            }
+            catch (err) {
+                console.error('Error updating note in Supabase:', err);
+            }
+        }));
+    });
+    // 3. Привязка кнопок удаления (.delete-btn) (ВНУТРИ renderDashboard!)
+    document.querySelectorAll('.delete-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => __awaiter(this, void 0, void 0, function* () {
+            const target = e.currentTarget;
+            const id = Number(target.getAttribute('data-id'));
+            if (!id)
+                return;
+            if (!confirm('Удалить эту позицию?'))
+                return;
+            try {
+                const { error } = yield supabaseClient
+                    .from(TABLE_NAME)
+                    .delete()
+                    .eq('id', id);
+                if (error) {
+                    console.error('Ошибка удаления из Supabase:', error);
+                    alert('Не удалось удалить строку: ' + error.message);
+                }
+                else {
+                    items = items.filter(i => i.id !== id);
+                    renderDashboard();
+                }
+            }
+            catch (err) {
+                console.error('Исключение при удалении:', err);
+            }
+        }));
+    });
+} // <-- Функция renderDashboard() должна закрываться ТОЛЬКО ЗДЕСЬ!
 // ==========================================
 // Функции управления порядком (стрелочки)
 // ==========================================
@@ -395,21 +461,17 @@ window.moveItemUp = function (itemId) {
         const item = items.find(i => i.id === itemId);
         if (!item)
             return;
-        // Берем элементы текущей секции и сортируем их по sort_order
         const sectionItems = items
             .filter(i => i.status === item.status)
             .sort((a, b) => { var _a, _b; return ((_a = a.sort_order) !== null && _a !== void 0 ? _a : 0) - ((_b = b.sort_order) !== null && _b !== void 0 ? _b : 0); });
         const index = sectionItems.findIndex(i => i.id === itemId);
         if (index <= 0)
-            return; // Уже на самом верху
-        // Перемещаем элемент выше в массиве
+            return;
         sectionItems.splice(index, 1);
         sectionItems.splice(index - 1, 0, item);
-        // Пересваиваем порядковые номера 0, 1, 2...
         sectionItems.forEach((it, idx) => {
             it.sort_order = idx;
         });
-        // Объединяем с остальными секциями
         const otherItems = items.filter(i => i.status !== item.status);
         items = [...otherItems, ...sectionItems];
         yield saveOrderAndRefresh();
@@ -425,15 +487,12 @@ window.moveItemDown = function (itemId) {
             .sort((a, b) => { var _a, _b; return ((_a = a.sort_order) !== null && _a !== void 0 ? _a : 0) - ((_b = b.sort_order) !== null && _b !== void 0 ? _b : 0); });
         const index = sectionItems.findIndex(i => i.id === itemId);
         if (index === -1 || index >= sectionItems.length - 1)
-            return; // Уже внизу
-        // Перемещаем элемент ниже в массиве
+            return;
         sectionItems.splice(index, 1);
         sectionItems.splice(index + 1, 0, item);
-        // Пересваиваем порядковые номера 0, 1, 2...
         sectionItems.forEach((it, idx) => {
             it.sort_order = idx;
         });
-        // Объединяем с остальными секциями
         const otherItems = items.filter(i => i.status !== item.status);
         items = [...otherItems, ...sectionItems];
         yield saveOrderAndRefresh();
@@ -455,46 +514,6 @@ function saveOrderAndRefresh() {
         renderDashboard();
     });
 }
-// Привязка инпутов калькулятора
-document.querySelectorAll('.item-calc-input').forEach(input => {
-    input.addEventListener('change', (e) => __awaiter(void 0, void 0, void 0, function* () {
-        const target = e.target;
-        const id = Number(target.getAttribute('data-id'));
-        const field = target.getAttribute('data-field');
-        const val = Number(target.value) || 0;
-        const targetItem = items.find(i => i.id === id);
-        if (targetItem && field) {
-            targetItem[field] = val;
-        }
-        try {
-            const updateObj = {};
-            updateObj[field] = val;
-            yield supabaseClient.from(TABLE_NAME).update(updateObj).eq('id', id);
-        }
-        catch (err) {
-            console.error('Error updating in Supabase:', err);
-        }
-        renderDashboard();
-    }));
-});
-// Привязка инпутов пометок (Note)
-document.querySelectorAll('.item-note-input').forEach(input => {
-    input.addEventListener('change', (e) => __awaiter(void 0, void 0, void 0, function* () {
-        const target = e.target;
-        const id = Number(target.getAttribute('data-id'));
-        const val = target.value;
-        const targetItem = items.find(i => i.id === id);
-        if (targetItem) {
-            targetItem.note = val;
-        }
-        try {
-            yield supabaseClient.from(TABLE_NAME).update({ note: val }).eq('id', id);
-        }
-        catch (err) {
-            console.error('Error updating note in Supabase:', err);
-        }
-    }));
-});
 // ==========================================
 // 5. Логика кнопки "Refresh"
 // ==========================================
