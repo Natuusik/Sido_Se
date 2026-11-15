@@ -351,61 +351,77 @@ function renderDashboard() {
         sectionDiv.innerHTML = tableContent;
         dashboardContainer.appendChild(sectionDiv);
     });
-    // ==========================================
-    // Логика Drag-and-Drop (перетаскивание строк)
-    // ==========================================
-    let draggedItem = null;
-    document.querySelectorAll('.draggable-row').forEach(row => {
-        row.addEventListener('dragstart', () => {
-            draggedItem = row;
-            setTimeout(() => row.classList.add('opacity-40'), 0);
+    // Инициализация Drag-and-Drop для ПК и мобильных устройств (через SortableJS)
+    document.querySelectorAll('.task-list-container').forEach(container => {
+        const sectionKey = container.getAttribute('data-section');
+        window.Sortable.create(container, {
+            animation: 150,
+            handle: '.draggable-row', // За какую часть строки можно тянуть
+            ghostClass: 'opacity-45',
+            onEnd: function () {
+                return __awaiter(this, void 0, void 0, function* () {
+                    // 1. Читаем актуальный порядок ID с экрана
+                    const newOrderIds = Array.from(container.querySelectorAll('.draggable-row'))
+                        .map(r => Number(r.getAttribute('data-id')));
+                    const otherItems = items.filter(i => i.status !== sectionKey);
+                    const reorderedSectionItems = newOrderIds
+                        .map(id => items.find(i => i.id === id))
+                        .filter(Boolean);
+                    // 2. Обновляем общий массив
+                    items = [...otherItems, ...reorderedSectionItems];
+                    // 3. Сохраняем новый порядок в базу Supabase
+                    try {
+                        for (let i = 0; i < newOrderIds.length; i++) {
+                            yield supabaseClient
+                                .from(TABLE_NAME)
+                                .update({ sort_order: i })
+                                .eq('id', newOrderIds[i]);
+                        }
+                    }
+                    catch (err) {
+                        console.error('Ошибка сохранения порядка в базу:', err);
+                    }
+                    // 4. Перерисовываем интерфейс
+                    renderDashboard();
+                });
+            }
         });
-        row.addEventListener('dragend', () => {
-            if (draggedItem)
-                draggedItem.classList.remove('opacity-40');
-            draggedItem = null;
+    });
+    // Инициализация Drag-and-Drop для ПК и мобильных через SortableJS
+    document.querySelectorAll('.task-list-container').forEach(container => {
+        const sectionKey = container.getAttribute('data-section');
+        window.Sortable.create(container, {
+            animation: 150,
+            handle: '.draggable-row',
+            ghostClass: 'opacity-45',
+            onEnd: function () {
+                return __awaiter(this, void 0, void 0, function* () {
+                    // 1. Собираем новый порядок ID в этой секции
+                    const newOrderIds = Array.from(container.querySelectorAll('.draggable-row'))
+                        .map(r => Number(r.getAttribute('data-id')));
+                    const otherItems = items.filter(i => i.status !== sectionKey);
+                    const reorderedSectionItems = newOrderIds
+                        .map(id => items.find(i => i.id === id))
+                        .filter(Boolean);
+                    // 2. Обновляем локальный массив
+                    items = [...otherItems, ...reorderedSectionItems];
+                    // 3. Сохраняем новый порядок (sort_order) в базу Supabase
+                    try {
+                        for (let i = 0; i < newOrderIds.length; i++) {
+                            yield supabaseClient
+                                .from(TABLE_NAME)
+                                .update({ sort_order: i })
+                                .eq('id', newOrderIds[i]);
+                        }
+                    }
+                    catch (err) {
+                        console.warn('Колонка sort_order еще не создана в базе, порядок сохранен локально');
+                    }
+                    // 4. Перерисовываем дашборд, чтобы номера мгновенно обновились
+                    renderDashboard();
+                });
+            }
         });
-        row.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            const container = row.closest('.task-list-container');
-            if (!container || !draggedItem)
-                return;
-            const afterElement = getDragAfterElement(container, e.clientY);
-            if (afterElement == null) {
-                container.appendChild(draggedItem);
-            }
-            else {
-                container.insertBefore(draggedItem, afterElement);
-            }
-        });
-        row.addEventListener('drop', (e) => __awaiter(this, void 0, void 0, function* () {
-            e.preventDefault();
-            const container = row.closest('.task-list-container');
-            if (!container)
-                return;
-            // 1. Собираем новый порядок ID в этой секции
-            const newOrderIds = Array.from(container.querySelectorAll('.draggable-row')).map(r => Number(r.getAttribute('data-id')));
-            const sectionKey = container.getAttribute('data-section');
-            const otherItems = items.filter(i => i.status !== sectionKey);
-            const reorderedSectionItems = newOrderIds.map(id => items.find(i => i.id === id)).filter(Boolean);
-            // 2. Обновляем локальный массив
-            items = [...otherItems, ...reorderedSectionItems];
-            // 3. Сохраняем новый порядок (sort_order) в базу Supabase
-            // Сохраняем новый порядок (если колонка sort_order существует)
-            try {
-                for (let i = 0; i < newOrderIds.length; i++) {
-                    yield supabaseClient
-                        .from(TABLE_NAME)
-                        .update({ sort_order: i })
-                        .eq('id', newOrderIds[i]);
-                }
-            }
-            catch (err) {
-                console.warn('Колонка sort_order еще не создана в базе, порядок сохранен локально');
-            }
-            // 4. Перерисовываем дашборд, чтобы номера (1, 2, 3...) мгновенно обновились
-            renderDashboard();
-        }));
     });
     function getDragAfterElement(container, y) {
         const draggableElements = Array.from(container.querySelectorAll('.draggable-row:not(.opacity-40)'));
