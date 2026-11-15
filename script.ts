@@ -387,17 +387,18 @@ function renderDashboard(): void {
   });
 
 /// Инициализация Drag-and-Drop с поддержкой мобильных устройств через иконку
- document.querySelectorAll('.task-list-container').forEach(container => {
+// Универсальная инициализация Drag-and-Drop для всех устройств
+  document.querySelectorAll('.task-list-container').forEach(container => {
     const sectionKey = container.getAttribute('data-section');
     
     (window as any).Sortable.create(container, {
       animation: 150,
-      handle: '.drag-handle', // Тянем строго за иконку ⠿
       ghostClass: 'opacity-45',  
-      touchAction: 'pan-y',     // Разрешает скролл страницы на телефоне
-      delay: 150,               // Задержка для сенсорных экранов
-      delayOnTouchOnly: true,
+      touchAction: 'pan-y',     // Позволяет нормально скроллить страницу пальцем на телефоне
+      delay: 200,               // Задержка 200мс на телефоне: отличает случайный скролл от перетаскивания
+      delayOnTouchOnly: true,   // На компьютере срабатывает мгновенно без всяких задержек
       onEnd: async function () {
+        // 1. Собираем новый порядок ID в этой секции
         const newOrderIds = Array.from(container.querySelectorAll('.draggable-row'))
           .map(r => Number(r.getAttribute('data-id')));
         
@@ -406,8 +407,10 @@ function renderDashboard(): void {
           .map(id => items.find(i => i.id === id))
           .filter(Boolean) as ProductionItem[];
         
+        // 2. Обновляем локальный массив
         items = [...otherItems, ...reorderedSectionItems];
 
+        // 3. Сохраняем новый порядок (sort_order) в базу Supabase
         try {
           for (let i = 0; i < newOrderIds.length; i++) {
             await supabaseClient
@@ -416,9 +419,10 @@ function renderDashboard(): void {
               .eq('id', newOrderIds[i]);
           }
         } catch (err) {
-          console.warn('Ошибка сохранения порядка:', err);
+          console.warn('Ошибка сохранения порядка в базу:', err);
         }
 
+        // 4. Перерисовываем дашборд
         renderDashboard();
       }
     });
