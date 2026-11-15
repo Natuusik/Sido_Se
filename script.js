@@ -61,6 +61,7 @@ const catalogDatabase = [
     { code: "722006", title: "FM 333x318 White / 850mic", pdfUrl: "./docs/722006.pdf" },
     { code: "722007", title: "FM 333x230 White", pdfUrl: "./docs/722007.pdf" },
     { code: "722016", title: "FM 440x318 White", pdfUrl: "./docs/722016.pdf" },
+    { code: "707072", title: "Replaceable drain pan for ONE series (10 pcs)", pdfUrl: "./docs/707072.docx" },
 ];
 let items = [];
 let lastUpdateTime = null;
@@ -268,12 +269,14 @@ function renderDashboard() {
             const title = tInput.value.trim();
             if (!code || !title)
                 return;
+            const catalogMatch = catalogDatabase.find(i => i.code === code);
+            const resolvedPdfUrl = catalogMatch ? catalogMatch.pdfUrl : `./docs/${code}.pdf`;
             const newItem = {
                 id: Date.now(),
                 code: code,
                 title: title,
                 status: 'process',
-                pdfUrl: `./docs/${code}.pdf`,
+                pdfUrl: resolvedPdfUrl,
                 quantity: 1,
                 multiplier: 100,
                 note: ''
@@ -356,6 +359,23 @@ function renderDashboard() {
                 const currentMultiplier = (_b = item.multiplier) !== null && _b !== void 0 ? _b : 100;
                 const rowTotal = currentQty * currentMultiplier; // Исправлено умножение
                 const currentNote = (_c = item.note) !== null && _c !== void 0 ? _c : '';
+                // Проверяем, есть ли у товара второй PDF в справочнике
+                const catalogEntry = catalogDatabase.find(c => c.code === item.code);
+                let secondFileHtml = '';
+                if (catalogEntry === null || catalogEntry === void 0 ? void 0 : catalogEntry.pdfUrl2) {
+                    const isWord = catalogEntry.pdfUrl2.toLowerCase().endsWith('.doc') || catalogEntry.pdfUrl2.toLowerCase().endsWith('.docx');
+                    const labelText = isWord ? 'Word' : 'Label';
+                    const icon = isWord ? '📝' : '📄';
+                    const colorClasses = isWord
+                        ? 'bg-sky-50 hover:bg-sky-100 border-sky-200 text-sky-700'
+                        : 'bg-rose-50 hover:bg-rose-100 border-rose-200 text-rose-600';
+                    secondFileHtml = `
+    <a href="${catalogEntry.pdfUrl2}" target="_blank" title="Open Document" class="group flex items-center space-x-1 px-2.5 py-1.5 rounded-xl border transition-colors shrink-0 ${colorClasses}">
+      <span class="font-mono font-bold text-xs">${labelText}</span>
+      <span class="text-xs">${icon}</span>
+    </a>
+  `;
+                }
                 // Колонка пометки добавляется ТОЛЬКО для In Progress (process)
                 const noteColumnHtml = section.key === 'process'
                     ? `<div class="w-full xl:w-40 shrink-0">
@@ -370,10 +390,13 @@ function renderDashboard() {
                 <button onclick="moveItemUp(${item.id})" class="text-stone-400 hover:text-stone-700 text-xs px-1" title="Move Up">▲</button>
                 <button onclick="moveItemDown(${item.id})" class="text-stone-400 hover:text-stone-700 text-xs px-1" title="Move Down">▼</button>
               </div>
-              <span class="text-stone-400 font-bold text-xs w-6 text-center bg-stone-100 py-1 rounded-lg shrink-0">${index + 1}</span>
-              <a href="${item.pdfUrl}" target="_blank" title="Open PDF" class="group flex items-center space-x-1.5 bg-stone-50 hover:bg-blue-50 px-3 py-1.5 rounded-xl border border-stone-200 transition-colors shrink-0">
+            
+                              <a href="${item.pdfUrl}" target="_blank" title="Open PDF" class="group flex items-center space-x-1.5 bg-stone-50 hover:bg-blue-50 px-3 py-1.5 rounded-xl border border-stone-200 transition-colors shrink-0">
                 <span class="font-mono font-bold text-blue-600 text-sm">${item.code}</span>
                 <span class="text-xs text-stone-400 group-hover:text-blue-600">📄</span>
+              </a>
+              ${secondFileHtml}
+
               </a>
               <div class="font-medium text-stone-800 text-sm md:text-base leading-snug truncate xl:truncate-none">
                 ${formatTitle(item.title)}
