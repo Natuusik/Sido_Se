@@ -351,49 +351,14 @@ function renderDashboard() {
         sectionDiv.innerHTML = tableContent;
         dashboardContainer.appendChild(sectionDiv);
     });
-    // Инициализация Drag-and-Drop для ПК и мобильных устройств (через SortableJS)
-    document.querySelectorAll('.task-list-container').forEach(container => {
-        const sectionKey = container.getAttribute('data-section');
-        window.Sortable.create(container, {
-            animation: 150,
-            handle: '.draggable-row', // За какую часть строки можно тянуть
-            ghostClass: 'opacity-45',
-            onEnd: function () {
-                return __awaiter(this, void 0, void 0, function* () {
-                    // 1. Читаем актуальный порядок ID с экрана
-                    const newOrderIds = Array.from(container.querySelectorAll('.draggable-row'))
-                        .map(r => Number(r.getAttribute('data-id')));
-                    const otherItems = items.filter(i => i.status !== sectionKey);
-                    const reorderedSectionItems = newOrderIds
-                        .map(id => items.find(i => i.id === id))
-                        .filter(Boolean);
-                    // 2. Обновляем общий массив
-                    items = [...otherItems, ...reorderedSectionItems];
-                    // 3. Сохраняем новый порядок в базу Supabase
-                    try {
-                        for (let i = 0; i < newOrderIds.length; i++) {
-                            yield supabaseClient
-                                .from(TABLE_NAME)
-                                .update({ sort_order: i })
-                                .eq('id', newOrderIds[i]);
-                        }
-                    }
-                    catch (err) {
-                        console.error('Ошибка сохранения порядка в базу:', err);
-                    }
-                    // 4. Перерисовываем интерфейс
-                    renderDashboard();
-                });
-            }
-        });
-    });
-    // Инициализация Drag-and-Drop для ПК и мобильных через SortableJS
+    /// Инициализация Drag-and-Drop для ПК и мобильных через SortableJS
     document.querySelectorAll('.task-list-container').forEach(container => {
         const sectionKey = container.getAttribute('data-section');
         window.Sortable.create(container, {
             animation: 150,
             handle: '.draggable-row',
             ghostClass: 'opacity-45',
+            touchAction: 'pan-y', // Позволяет скроллить страницу пальцем и перетаскивать строки на мобильных
             onEnd: function () {
                 return __awaiter(this, void 0, void 0, function* () {
                     // 1. Собираем новый порядок ID в этой секции
@@ -423,19 +388,6 @@ function renderDashboard() {
             }
         });
     });
-    function getDragAfterElement(container, y) {
-        const draggableElements = Array.from(container.querySelectorAll('.draggable-row:not(.opacity-40)'));
-        return draggableElements.reduce((closest, child) => {
-            const box = child.getBoundingClientRect();
-            const offset = y - box.top - box.height / 2; // Исправленная формула расчета смещения
-            if (offset < 0 && offset > closest.offset) {
-                return { offset: offset, element: child };
-            }
-            else {
-                return closest;
-            }
-        }, { offset: Number.NEGATIVE_INFINITY, element: null }).element;
-    }
     // Привязка кнопок удаления
     const currentContainer = document.getElementById('dashboard-container');
     if (currentContainer) {
