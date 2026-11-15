@@ -314,7 +314,7 @@ function renderDashboard() {
              </div>`
                     : '';
                 tableContent += `
-          <div draggable="true" data-id="${item.id}" class="draggable-row flex flex-col xl:flex-row items-start xl:items-center justify-between p-4 bg-white rounded-2xl border border-stone-200/80 border-l-4 ${borderAccentClass} shadow-sm transition-all hover:shadow-md gap-4">
+          <div data-id="${item.id}" class="draggable-row flex flex-col xl:flex-row items-start xl:items-center justify-between p-4 bg-white rounded-2xl border border-stone-200/80 border-l-4 ${borderAccentClass} shadow-sm transition-all hover:shadow-md gap-4">
             <div class="flex items-center space-x-3 w-full xl:w-auto overflow-hidden">
               <span class="drag-handle text-stone-300 hover:text-stone-500 select-none text-base cursor-grab active:cursor-grabbing px-2" title="Drag to reorder">⠿</span>
               <span class="text-stone-400 font-bold text-xs w-6 text-center bg-stone-100 py-1 rounded-lg shrink-0">${index + 1}</span>
@@ -351,28 +351,24 @@ function renderDashboard() {
         sectionDiv.innerHTML = tableContent;
         dashboardContainer.appendChild(sectionDiv);
     });
-    /// Инициализация Drag-and-Drop с поддержкой мобильных устройств через иконку
-    // Универсальная инициализация Drag-and-Drop для всех устройств
+    // Инициализация Drag-and-Drop через SortableJS
     document.querySelectorAll('.task-list-container').forEach(container => {
         const sectionKey = container.getAttribute('data-section');
         window.Sortable.create(container, {
             animation: 150,
             ghostClass: 'opacity-45',
-            touchAction: 'pan-y', // Позволяет нормально скроллить страницу пальцем на телефоне
-            delay: 200, // Задержка 200мс на телефоне: отличает случайный скролл от перетаскивания
-            delayOnTouchOnly: true, // На компьютере срабатывает мгновенно без всяких задержек
+            touchAction: 'pan-y', // Позволяет скроллить страницу пальцем
+            delay: 150, // Задержка для мобильных, чтобы отличать скролл от переноса
+            delayOnTouchOnly: true, // На ПК работает мгновенно без задержек
             onEnd: function () {
                 return __awaiter(this, void 0, void 0, function* () {
-                    // 1. Собираем новый порядок ID в этой секции
                     const newOrderIds = Array.from(container.querySelectorAll('.draggable-row'))
                         .map(r => Number(r.getAttribute('data-id')));
                     const otherItems = items.filter(i => i.status !== sectionKey);
                     const reorderedSectionItems = newOrderIds
                         .map(id => items.find(i => i.id === id))
                         .filter(Boolean);
-                    // 2. Обновляем локальный массив
                     items = [...otherItems, ...reorderedSectionItems];
-                    // 3. Сохраняем новый порядок (sort_order) в базу Supabase
                     try {
                         for (let i = 0; i < newOrderIds.length; i++) {
                             yield supabaseClient
@@ -382,9 +378,8 @@ function renderDashboard() {
                         }
                     }
                     catch (err) {
-                        console.warn('Ошибка сохранения порядка в базу:', err);
+                        console.warn('Ошибка сохранения порядка:', err);
                     }
-                    // 4. Перерисовываем дашборд
                     renderDashboard();
                 });
             }
