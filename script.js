@@ -28,7 +28,18 @@ const catalogDatabase = [
     { code: "714013", title: "End Paper A3 Portrait Black", pdfUrl: "./docs/714013.pdf" },
     { code: "714014", title: "End Paper Letter Portrait Black", pdfUrl: "./docs/714014.pdf" },
     { code: "714016", title: "End Paper 305x305 Square Black", pdfUrl: "./docs/714016.pdf" },
+    { code: "732002", title: "BXT A4 Portrait White", pdfUrl: "./docs/732002.pdf" },
+    { code: "732005", title: "BXT A4 Landscape Black", pdfUrl: "./docs/732005.pdf" },
+    { code: "732007", title: "BXT Letter Landscape White", pdfUrl: "./docs/732007.pdf" },
     { code: "732008", title: "BXT Letter Portrait White", pdfUrl: "./docs/732008.pdf" },
+    { code: "732011", title: "BXT Letter Landscape Black", pdfUrl: "./docs/732011.pdf" },
+    { code: "732013", title: "BXT A4 Portrait Black", pdfUrl: "./docs/732013.pdf" },
+    { code: "732018", title: "BXT 203x203 Square Black", pdfUrl: "./docs/732018.pdf" },
+    { code: "732019", title: "BXT 305x305 Square Black", pdfUrl: "./docs/732019.pdf" },
+    { code: "732021", title: "BXT 305x305 Square White", pdfUrl: "./docs/732021.pdf" },
+    { code: "732024", title: "BXT Letter Portrait Black", pdfUrl: "./docs/732024.pdf" },
+    { code: "732048", title: "BXT Black Special Endsheet 295 x 210 Landscape NSM", pdfUrl: "./docs/732048.pdf" },
+    { code: "732054", title: "BXT End sheet white 254 x 254 mm Square", pdfUrl: "./docs/732054.pdf" },
 ];
 let items = [];
 let lastUpdateTime = null;
