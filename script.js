@@ -314,9 +314,9 @@ function renderDashboard() {
              </div>`
                     : '';
                 tableContent += `
-          <div draggable="true" data-id="${item.id}" class="draggable-row flex flex-col xl:flex-row items-start xl:items-center justify-between p-4 bg-white rounded-2xl border border-stone-200/80 border-l-4 ${borderAccentClass} shadow-sm transition-all hover:shadow-md gap-4 cursor-grab active:cursor-grabbing">
+          <div draggable="true" data-id="${item.id}" class="draggable-row flex flex-col xl:flex-row items-start xl:items-center justify-between p-4 bg-white rounded-2xl border border-stone-200/80 border-l-4 ${borderAccentClass} shadow-sm transition-all hover:shadow-md gap-4">
             <div class="flex items-center space-x-3 w-full xl:w-auto overflow-hidden">
-              <span class="text-stone-300 hover:text-stone-500 select-none text-base hidden sm:inline" title="Drag to reorder">⠿</span>
+              <span class="drag-handle text-stone-300 hover:text-stone-500 select-none text-base cursor-grab active:cursor-grabbing px-2" title="Drag to reorder">⠿</span>
               <span class="text-stone-400 font-bold text-xs w-6 text-center bg-stone-100 py-1 rounded-lg shrink-0">${index + 1}</span>
               <a href="${item.pdfUrl}" target="_blank" title="Open PDF" class="group flex items-center space-x-1.5 bg-stone-50 hover:bg-blue-50 px-3 py-1.5 rounded-xl border border-stone-200 transition-colors shrink-0">
                 <span class="font-mono font-bold text-blue-600 text-sm">${item.code}</span>
@@ -351,26 +351,25 @@ function renderDashboard() {
         sectionDiv.innerHTML = tableContent;
         dashboardContainer.appendChild(sectionDiv);
     });
-    /// Инициализация Drag-and-Drop для ПК и мобильных через SortableJS
+    /// Инициализация Drag-and-Drop с поддержкой мобильных устройств через иконку
     document.querySelectorAll('.task-list-container').forEach(container => {
         const sectionKey = container.getAttribute('data-section');
         window.Sortable.create(container, {
             animation: 150,
-            handle: '.draggable-row',
+            handle: '.drag-handle', // Тянем строго за иконку ⠿
             ghostClass: 'opacity-45',
-            touchAction: 'pan-y', // Позволяет скроллить страницу пальцем и перетаскивать строки на мобильных
+            touchAction: 'pan-y', // Разрешает скролл страницы на телефоне
+            delay: 150, // Задержка для сенсорных экранов
+            delayOnTouchOnly: true,
             onEnd: function () {
                 return __awaiter(this, void 0, void 0, function* () {
-                    // 1. Собираем новый порядок ID в этой секции
                     const newOrderIds = Array.from(container.querySelectorAll('.draggable-row'))
                         .map(r => Number(r.getAttribute('data-id')));
                     const otherItems = items.filter(i => i.status !== sectionKey);
                     const reorderedSectionItems = newOrderIds
                         .map(id => items.find(i => i.id === id))
                         .filter(Boolean);
-                    // 2. Обновляем локальный массив
                     items = [...otherItems, ...reorderedSectionItems];
-                    // 3. Сохраняем новый порядок (sort_order) в базу Supabase
                     try {
                         for (let i = 0; i < newOrderIds.length; i++) {
                             yield supabaseClient
@@ -380,9 +379,8 @@ function renderDashboard() {
                         }
                     }
                     catch (err) {
-                        console.warn('Колонка sort_order еще не создана в базе, порядок сохранен локально');
+                        console.warn('Ошибка сохранения порядка:', err);
                     }
-                    // 4. Перерисовываем дашборд, чтобы номера мгновенно обновились
                     renderDashboard();
                 });
             }
