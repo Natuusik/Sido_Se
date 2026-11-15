@@ -81,7 +81,17 @@ const catalogDatabase: CatalogItem[] = [
   { code: "722007", title: "FM 333x230 White", pdfUrl: "./docs/722007.pdf" },
   { code: "722016", title: "FM 440x318 White", pdfUrl: "./docs/722016.pdf" },
 
-    { code: "707072", title: "Replaceable drain pan for ONE series (10 pcs)", pdfUrl: "./docs/707072.docx" },
+      { code: "707072", title: "Replaceable drain pan for ONE series (10 pcs)", pdfUrl: "./docs/707072.pdf" },
+  { code: "714020", title: "End Paper Pro HD 220x220mm White", pdfUrl: "./docs/714020.pdf" },
+  { code: "714023", title: "End Paper Pro HD Letter Portrait White", pdfUrl: "./docs/714023.pdf" },
+  { code: "714187", title: "End Paper A5 White", pdfUrl: "./docs/714187.pdf" },
+  { code: "714212", title: "End Paper A4 White - New Material", pdfUrl: "./docs/714212.pdf" },
+  { code: "721003_Spesial (230 )", title: "SPECIAL FB FM End sheet white 333 x 230 mm / 200 mic", pdfUrl: "./docs/721003_Spesial_230.pdf" },
+  { code: "721003_Spesial (318)", title: "SPECIAL FB FM End sheet white 333 x 318 mm / 200 mic", pdfUrl: "./docs/721003_Spesial_318.pdf" },
+  { code: "722029", title: "FM 210x290 White", pdfUrl: "./docs/722029.pdf" },
+  { code: "722036", title: "FM 195x190 White", pdfUrl: "./docs/722036.pdf" },
+  { code: "732048_Special", title: "BXT Landscape 295x210 Black", pdfUrl: "./docs/732048_Special.pdf" },
+
 ];
 let items: ProductionItem[] = [];
 let lastUpdateTime: Date | null = null;
