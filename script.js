@@ -162,7 +162,7 @@ window.editItemModal = function (itemId) {
     });
 };
 // ==========================================
-// 4. Отрисовка дашборда и Drag-and-Drop
+// 4. Отрисовка дашборда и кнопок управления
 // ==========================================
 function renderDashboard() {
     if (!dashboardContainer)
@@ -267,7 +267,7 @@ function renderDashboard() {
             ? `<div class="flex flex-wrap items-center gap-2 no-print">
           <button id="print-${section.key}-table" class="bg-stone-800 hover:bg-stone-900 text-white text-xs px-3.5 py-2 rounded-xl font-medium transition-colors shadow-sm flex items-center space-x-1"><span>🖨️ Print / PDF</span></button>
           <button id="copy-${section.key}-table" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3.5 py-2 rounded-xl font-medium transition-colors shadow-sm flex items-center space-x-1"><span>📋 To Word</span></button>
-        </div>`
+         </div>`
             : '';
         let tableContent = `
       <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
@@ -305,7 +305,7 @@ function renderDashboard() {
                 }
                 const currentQty = (_a = item.quantity) !== null && _a !== void 0 ? _a : 1;
                 const currentMultiplier = (_b = item.multiplier) !== null && _b !== void 0 ? _b : 100;
-                const rowTotal = currentQty * currentMultiplier;
+                const rowTotal = currentQty * currentMultiplier; // Исправлено умножение
                 const currentNote = (_c = item.note) !== null && _c !== void 0 ? _c : '';
                 // Колонка пометки добавляется ТОЛЬКО для In Progress (process)
                 const noteColumnHtml = section.key === 'process'
@@ -316,7 +316,11 @@ function renderDashboard() {
                 tableContent += `
           <div data-id="${item.id}" class="draggable-row flex flex-col xl:flex-row items-start xl:items-center justify-between p-4 bg-white rounded-2xl border border-stone-200/80 border-l-4 ${borderAccentClass} shadow-sm transition-all hover:shadow-md gap-4">
             <div class="flex items-center space-x-3 w-full xl:w-auto overflow-hidden">
-              <span class="drag-handle text-stone-300 hover:text-stone-500 select-none text-base cursor-grab active:cursor-grabbing px-2" title="Drag to reorder">⠿</span>
+              <!-- Кнопки перемещения вверх / вниз -->
+              <div class="flex flex-col space-y-0.5 no-print">
+                <button onclick="moveItemUp(${item.id})" class="text-stone-400 hover:text-stone-700 text-xs px-1" title="Move Up">▲</button>
+                <button onclick="moveItemDown(${item.id})" class="text-stone-400 hover:text-stone-700 text-xs px-1" title="Move Down">▼</button>
+              </div>
               <span class="text-stone-400 font-bold text-xs w-6 text-center bg-stone-100 py-1 rounded-lg shrink-0">${index + 1}</span>
               <a href="${item.pdfUrl}" target="_blank" title="Open PDF" class="group flex items-center space-x-1.5 bg-stone-50 hover:bg-blue-50 px-3 py-1.5 rounded-xl border border-stone-200 transition-colors shrink-0">
                 <span class="font-mono font-bold text-blue-600 text-sm">${item.code}</span>
@@ -351,102 +355,104 @@ function renderDashboard() {
         sectionDiv.innerHTML = tableContent;
         dashboardContainer.appendChild(sectionDiv);
     });
-    /// Инициализация Drag-and-Drop через SortableJS (тянем за иконку ⠿)
-    document.querySelectorAll('.task-list-container').forEach(container => {
-        const sectionKey = container.getAttribute('data-section');
-        window.Sortable.create(container, {
-            animation: 150,
-            handle: '.drag-handle', // Перетаскивание происходит строго за иконку ⠿
-            ghostClass: 'opacity-45',
-            touchAction: 'pan-y', // Позволяет свободно скроллить страницу пальцем
-            onEnd: function () {
-                return __awaiter(this, void 0, void 0, function* () {
-                    // 1. Собираем новый порядок ID в этой секции
-                    const newOrderIds = Array.from(container.querySelectorAll('.draggable-row'))
-                        .map(r => Number(r.getAttribute('data-id')));
-                    const otherItems = items.filter(i => i.status !== sectionKey);
-                    const reorderedSectionItems = newOrderIds
-                        .map(id => items.find(i => i.id === id))
-                        .filter(Boolean);
-                    // 2. Обновляем локальный массив
-                    items = [...otherItems, ...reorderedSectionItems];
-                    // 3. Сохраняем новый порядок (sort_order) в базу Supabase
-                    try {
-                        for (let i = 0; i < newOrderIds.length; i++) {
-                            yield supabaseClient
-                                .from(TABLE_NAME)
-                                .update({ sort_order: i })
-                                .eq('id', newOrderIds[i]);
-                        }
-                    }
-                    catch (err) {
-                        console.warn('Ошибка сохранения порядка в базу:', err);
-                    }
-                    // 4. Перерисовываем дашборд
-                    renderDashboard();
-                });
-            }
+}
+// ==========================================
+// Функции управления порядком (стрелочки)
+// ==========================================
+window.moveItemUp = function (itemId) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const item = items.find(i => i.id === itemId);
+        if (!item)
+            return;
+        const sectionItems = items.filter(i => i.status === item.status);
+        const sectionIndex = sectionItems.findIndex(i => i.id === itemId);
+        if (sectionIndex <= 0)
+            return; // Уже в самом верху секции
+        sectionItems.forEach((it, idx) => {
+            it.sort_order = idx;
         });
+        const targetItem = sectionItems[sectionIndex - 1];
+        const temp = item.sort_order;
+        item.sort_order = targetItem.sort_order;
+        targetItem.sort_order = temp;
+        yield saveOrderAndRefresh();
     });
-    // Привязка кнопок удаления
-    const currentContainer = document.getElementById('dashboard-container');
-    if (currentContainer) {
-        currentContainer.querySelectorAll('.delete-btn').forEach(btn => {
-            btn.addEventListener('click', () => __awaiter(this, void 0, void 0, function* () {
-                const id = Number(btn.getAttribute('data-id'));
-                if (!id)
-                    return;
-                const { error } = yield supabaseClient.from(TABLE_NAME).delete().eq('id', id);
-                if (error) {
-                    console.error('Error deleting item:', error);
-                }
-                else {
-                    yield fetchItemsFromSupabase();
-                }
-            }));
+};
+window.moveItemDown = function (itemId) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const item = items.find(i => i.id === itemId);
+        if (!item)
+            return;
+        const sectionItems = items.filter(i => i.status === item.status);
+        const sectionIndex = sectionItems.findIndex(i => i.id === itemId);
+        if (sectionIndex === -1 || sectionIndex >= sectionItems.length - 1)
+            return; // Уже внизу секции
+        sectionItems.forEach((it, idx) => {
+            it.sort_order = idx;
         });
-    }
-    // Привязка инпутов калькулятора
-    document.querySelectorAll('.item-calc-input').forEach(input => {
-        input.addEventListener('change', (e) => __awaiter(this, void 0, void 0, function* () {
-            const target = e.target;
-            const id = Number(target.getAttribute('data-id'));
-            const field = target.getAttribute('data-field');
-            const val = Number(target.value) || 0;
-            const targetItem = items.find(i => i.id === id);
-            if (targetItem && field) {
-                targetItem[field] = val;
-            }
-            try {
-                const updateObj = {};
-                updateObj[field] = val;
-                yield supabaseClient.from(TABLE_NAME).update(updateObj).eq('id', id);
-            }
-            catch (err) {
-                console.error('Error updating in Supabase:', err);
-            }
-            renderDashboard();
-        }));
+        const targetItem = sectionItems[sectionIndex + 1];
+        const temp = item.sort_order;
+        item.sort_order = targetItem.sort_order;
+        targetItem.sort_order = temp;
+        yield saveOrderAndRefresh();
     });
-    // Привязка инпутов пометок (Note)
-    document.querySelectorAll('.item-note-input').forEach(input => {
-        input.addEventListener('change', (e) => __awaiter(this, void 0, void 0, function* () {
-            const target = e.target;
-            const id = Number(target.getAttribute('data-id'));
-            const val = target.value;
-            const targetItem = items.find(i => i.id === id);
-            if (targetItem) {
-                targetItem.note = val;
+};
+function saveOrderAndRefresh() {
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            for (const item of items) {
+                yield supabaseClient
+                    .from(TABLE_NAME)
+                    .update({ sort_order: item.sort_order })
+                    .eq('id', item.id);
             }
-            try {
-                yield supabaseClient.from(TABLE_NAME).update({ note: val }).eq('id', id);
-            }
-            catch (err) {
-                console.error('Error updating note in Supabase:', err);
-            }
-        }));
+        }
+        catch (err) {
+            console.warn('Ошибка сохранения порядка в базу:', err);
+        }
+        renderDashboard();
     });
 }
+// Привязка инпутов калькулятора
+document.querySelectorAll('.item-calc-input').forEach(input => {
+    input.addEventListener('change', (e) => __awaiter(void 0, void 0, void 0, function* () {
+        const target = e.target;
+        const id = Number(target.getAttribute('data-id'));
+        const field = target.getAttribute('data-field');
+        const val = Number(target.value) || 0;
+        const targetItem = items.find(i => i.id === id);
+        if (targetItem && field) {
+            targetItem[field] = val;
+        }
+        try {
+            const updateObj = {};
+            updateObj[field] = val;
+            yield supabaseClient.from(TABLE_NAME).update(updateObj).eq('id', id);
+        }
+        catch (err) {
+            console.error('Error updating in Supabase:', err);
+        }
+        renderDashboard();
+    }));
+});
+// Привязка инпутов пометок (Note)
+document.querySelectorAll('.item-note-input').forEach(input => {
+    input.addEventListener('change', (e) => __awaiter(void 0, void 0, void 0, function* () {
+        const target = e.target;
+        const id = Number(target.getAttribute('data-id'));
+        const val = target.value;
+        const targetItem = items.find(i => i.id === id);
+        if (targetItem) {
+            targetItem.note = val;
+        }
+        try {
+            yield supabaseClient.from(TABLE_NAME).update({ note: val }).eq('id', id);
+        }
+        catch (err) {
+            console.error('Error updating note in Supabase:', err);
+        }
+    }));
+});
 // ==========================================
 // 5. Логика кнопки "Refresh"
 // ==========================================

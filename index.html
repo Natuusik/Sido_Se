@@ -5,25 +5,21 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ERP Dashboard - Управление производством</title>
   <!-- Подключаем Tailwind CSS -->
-   <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
 <style>
-
   /* Настройки для мобильной версии (экраны до 640px) */
   @media (max-width: 640px) {
-    /* Находим верхнюю строку карточки, где лежат номер, код и название, и разрешаем перенос */
     #dashboard-container [class*="rounded-2xl"][class*="border"] > div:first-child,
     #dashboard-container [class*="rounded-xl"][class*="border"] > div:first-child {
       flex-wrap: wrap !important;
       row-gap: 8px !important;
     }
 
-    /* Название товара (последний элемент в верхней строке) ставим на новую строку на всю ширину */
     #dashboard-container [class*="rounded-2xl"][class*="border"] > div:first-child > *:last-child,
     #dashboard-container [class*="rounded-xl"][class*="border"] > div:first-child > *:last-child {
       flex-basis: 100% !important;
       width: 100% !important;
-      white-space: normal !important; /* Отменяем обрезание текста многоточием (truncate) */
+      white-space: normal !important;
       overflow: visible !important;
       text-overflow: clip !important;
       padding-left: 2px !important;
@@ -40,12 +36,10 @@
       margin: 12mm;
     }
 
-    /* Прячем весь интерфейс сайта при печати */
     body > *:not(#custom-print-area) {
       display: none !important;
     }
 
-    /* Показываем только нашу чистую таблицу для печати */
     #custom-print-area {
       display: block !important;
       width: 100%;
@@ -80,12 +74,9 @@
       print-color-adjust: exact;
     }
 
-    /* Левая часть (Текст) */
     .col-num { width: 35px; text-align: center; }
     .col-code { width: 90px; text-align: center; font-family: monospace; font-weight: bold; }
     .col-title { text-align: left; }
-
-    /* Правая часть (Цифры) — отделена толстой вертикальной линией */
     .col-qty { width: 70px; text-align: right; border-left: 2px solid #4b5563 !important; }
     .col-mult { width: 70px; text-align: right; }
     .col-total { width: 85px; text-align: right; font-weight: bold; }
@@ -229,7 +220,6 @@
         sectionTitle = 'In Progress';
       }
 
-      // Достаем данные прямо из карточек на экране
       const rows = Array.from(section.querySelectorAll('.draggable-row'));
       if (rows.length === 0) {
         alert('No data available in this section to copy.');
@@ -322,6 +312,7 @@
     }
   });
 </script>
+
   <!-- Подключаем Supabase клиент через CDN -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <!-- Подключаем скомпилированный скрипт -->
