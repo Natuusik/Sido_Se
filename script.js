@@ -112,15 +112,30 @@ function fetchItemsFromSupabase() {
 window.markAsReady = function (itemId) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
+            // 1. Находим элемент в локальном массиве
+            const item = items.find(i => i.id === itemId);
+            if (!item)
+                return;
+            // 2. Вычисляем следующий sort_order для секции 'ready' (чтобы встал в самый конец готовых)
+            const readyItems = items.filter(i => i.status === 'ready');
+            const maxSortOrder = readyItems.length > 0
+                ? Math.max(...readyItems.map(i => { var _a; return (_a = i.sort_order) !== null && _a !== void 0 ? _a : 0; }))
+                : -1;
+            const newSortOrder = maxSortOrder + 1;
+            // 3. Обновляем статус и новый порядок в Supabase
             const { error } = yield supabaseClient
                 .from(TABLE_NAME)
-                .update({ status: 'ready' })
+                .update({
+                status: 'ready',
+                sort_order: newSortOrder
+            })
                 .eq('id', itemId);
             if (error) {
                 console.error('Ошибка Supabase:', error);
                 alert('Не удалось обновить статус: ' + error.message);
             }
             else {
+                // 4. Перезагружаем актуальные данные с сервера и перерисовываем дашборд
                 yield fetchItemsFromSupabase();
             }
         }
@@ -258,7 +273,9 @@ function renderDashboard() {
         }
     ];
     targetSections.forEach(section => {
-        const groupItems = items.filter(item => item.status === section.key);
+        const groupItems = items
+            .filter(item => item.status === section.key)
+            .sort((a, b) => { var _a, _b; return ((_a = a.sort_order) !== null && _a !== void 0 ? _a : 0) - ((_b = b.sort_order) !== null && _b !== void 0 ? _b : 0); });
         const count = groupItems.length;
         const sectionDiv = document.createElement('div');
         sectionDiv.id = `${section.key}-section`;
@@ -359,22 +376,31 @@ function renderDashboard() {
 // ==========================================
 // Функции управления порядком (стрелочки)
 // ==========================================
+// ==========================================
+// Функции управления порядком (стрелочки)
+// ==========================================
 window.moveItemUp = function (itemId) {
     return __awaiter(this, void 0, void 0, function* () {
         const item = items.find(i => i.id === itemId);
         if (!item)
             return;
-        const sectionItems = items.filter(i => i.status === item.status);
-        const sectionIndex = sectionItems.findIndex(i => i.id === itemId);
-        if (sectionIndex <= 0)
-            return; // Уже в самом верху секции
+        // Берем элементы текущей секции и сортируем их по sort_order
+        const sectionItems = items
+            .filter(i => i.status === item.status)
+            .sort((a, b) => { var _a, _b; return ((_a = a.sort_order) !== null && _a !== void 0 ? _a : 0) - ((_b = b.sort_order) !== null && _b !== void 0 ? _b : 0); });
+        const index = sectionItems.findIndex(i => i.id === itemId);
+        if (index <= 0)
+            return; // Уже на самом верху
+        // Перемещаем элемент выше в массиве
+        sectionItems.splice(index, 1);
+        sectionItems.splice(index - 1, 0, item);
+        // Пересваиваем порядковые номера 0, 1, 2...
         sectionItems.forEach((it, idx) => {
             it.sort_order = idx;
         });
-        const targetItem = sectionItems[sectionIndex - 1];
-        const temp = item.sort_order;
-        item.sort_order = targetItem.sort_order;
-        targetItem.sort_order = temp;
+        // Объединяем с остальными секциями
+        const otherItems = items.filter(i => i.status !== item.status);
+        items = [...otherItems, ...sectionItems];
         yield saveOrderAndRefresh();
     });
 };
@@ -383,17 +409,22 @@ window.moveItemDown = function (itemId) {
         const item = items.find(i => i.id === itemId);
         if (!item)
             return;
-        const sectionItems = items.filter(i => i.status === item.status);
-        const sectionIndex = sectionItems.findIndex(i => i.id === itemId);
-        if (sectionIndex === -1 || sectionIndex >= sectionItems.length - 1)
-            return; // Уже внизу секции
+        const sectionItems = items
+            .filter(i => i.status === item.status)
+            .sort((a, b) => { var _a, _b; return ((_a = a.sort_order) !== null && _a !== void 0 ? _a : 0) - ((_b = b.sort_order) !== null && _b !== void 0 ? _b : 0); });
+        const index = sectionItems.findIndex(i => i.id === itemId);
+        if (index === -1 || index >= sectionItems.length - 1)
+            return; // Уже внизу
+        // Перемещаем элемент ниже в массиве
+        sectionItems.splice(index, 1);
+        sectionItems.splice(index + 1, 0, item);
+        // Пересваиваем порядковые номера 0, 1, 2...
         sectionItems.forEach((it, idx) => {
             it.sort_order = idx;
         });
-        const targetItem = sectionItems[sectionIndex + 1];
-        const temp = item.sort_order;
-        item.sort_order = targetItem.sort_order;
-        targetItem.sort_order = temp;
+        // Объединяем с остальными секциями
+        const otherItems = items.filter(i => i.status !== item.status);
+        items = [...otherItems, ...sectionItems];
         yield saveOrderAndRefresh();
     });
 };

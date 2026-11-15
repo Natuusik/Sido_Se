@@ -130,22 +130,37 @@ async function fetchItemsFromSupabase(): Promise<void> {
 // Глобальная функция для кнопки "Done"
 (window as any).markAsReady = async function(itemId: number) {
   try {
+    // 1. Находим элемент в локальном массиве
+    const item = items.find(i => i.id === itemId);
+    if (!item) return;
+
+    // 2. Вычисляем следующий sort_order для секции 'ready' (чтобы встал в самый конец готовых)
+    const readyItems = items.filter(i => i.status === 'ready');
+    const maxSortOrder = readyItems.length > 0 
+      ? Math.max(...readyItems.map(i => i.sort_order ?? 0)) 
+      : -1;
+    const newSortOrder = maxSortOrder + 1;
+
+    // 3. Обновляем статус и новый порядок в Supabase
     const { error } = await supabaseClient
       .from(TABLE_NAME)
-      .update({ status: 'ready' })
+      .update({ 
+        status: 'ready',
+        sort_order: newSortOrder 
+      })
       .eq('id', itemId);
 
     if (error) {
       console.error('Ошибка Supabase:', error);
       alert('Не удалось обновить статус: ' + error.message);
     } else {
+      // 4. Перезагружаем актуальные данные с сервера и перерисовываем дашборд
       await fetchItemsFromSupabase();
     }
   } catch (err) {
     console.error('Ошибка в markAsReady:', err);
   }
 };
-
 // Функция редактирования карточки (Карандашик)
 (window as any).editItemModal = function(itemId: number) {
   const item = items.find(i => i.id === itemId);
@@ -286,7 +301,9 @@ function renderDashboard(): void {
   ];
 
   targetSections.forEach(section => {
-    const groupItems = items.filter(item => item.status === section.key);
+   const groupItems = items
+  .filter(item => item.status === section.key)
+  .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
     const count = groupItems.length;
     
     const sectionDiv = document.createElement('div');
@@ -395,23 +412,33 @@ function renderDashboard(): void {
 // ==========================================
 // Функции управления порядком (стрелочки)
 // ==========================================
+// ==========================================
+// Функции управления порядком (стрелочки)
+// ==========================================
 (window as any).moveItemUp = async function(itemId: number) {
   const item = items.find(i => i.id === itemId);
   if (!item) return;
 
-  const sectionItems = items.filter(i => i.status === item.status);
-  const sectionIndex = sectionItems.findIndex(i => i.id === itemId);
-  
-  if (sectionIndex <= 0) return; // Уже в самом верху секции
+  // Берем элементы текущей секции и сортируем их по sort_order
+  const sectionItems = items
+    .filter(i => i.status === item.status)
+    .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
 
+  const index = sectionItems.findIndex(i => i.id === itemId);
+  if (index <= 0) return; // Уже на самом верху
+
+  // Перемещаем элемент выше в массиве
+  sectionItems.splice(index, 1);
+  sectionItems.splice(index - 1, 0, item);
+
+  // Пересваиваем порядковые номера 0, 1, 2...
   sectionItems.forEach((it, idx) => {
     it.sort_order = idx;
   });
 
-  const targetItem = sectionItems[sectionIndex - 1];
-  const temp = item.sort_order;
-  item.sort_order = targetItem.sort_order;
-  targetItem.sort_order = temp;
+  // Объединяем с остальными секциями
+  const otherItems = items.filter(i => i.status !== item.status);
+  items = [...otherItems, ...sectionItems];
 
   await saveOrderAndRefresh();
 };
@@ -420,19 +447,25 @@ function renderDashboard(): void {
   const item = items.find(i => i.id === itemId);
   if (!item) return;
 
-  const sectionItems = items.filter(i => i.status === item.status);
-  const sectionIndex = sectionItems.findIndex(i => i.id === itemId);
-  
-  if (sectionIndex === -1 || sectionIndex >= sectionItems.length - 1) return; // Уже внизу секции
+  const sectionItems = items
+    .filter(i => i.status === item.status)
+    .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
 
+  const index = sectionItems.findIndex(i => i.id === itemId);
+  if (index === -1 || index >= sectionItems.length - 1) return; // Уже внизу
+
+  // Перемещаем элемент ниже в массиве
+  sectionItems.splice(index, 1);
+  sectionItems.splice(index + 1, 0, item);
+
+  // Пересваиваем порядковые номера 0, 1, 2...
   sectionItems.forEach((it, idx) => {
     it.sort_order = idx;
   });
 
-  const targetItem = sectionItems[sectionIndex + 1];
-  const temp = item.sort_order;
-  item.sort_order = targetItem.sort_order;
-  targetItem.sort_order = temp;
+  // Объединяем с остальными секциями
+  const otherItems = items.filter(i => i.status !== item.status);
+  items = [...otherItems, ...sectionItems];
 
   await saveOrderAndRefresh();
 };
