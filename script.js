@@ -280,6 +280,12 @@ function renderDashboard() {
                 return;
             const catalogMatch = catalogDatabase.find(i => i.code === code);
             const resolvedPdfUrl = catalogMatch ? catalogMatch.pdfUrl : `./docs/${code}.pdf`;
+            // Вычисляем следующий порядковый номер для секции 'process'
+            const processItems = items.filter(i => i.status === 'process');
+            const maxSortOrder = processItems.length > 0
+                ? Math.max(...processItems.map(i => { var _a; return (_a = i.sort_order) !== null && _a !== void 0 ? _a : 0; }))
+                : -1;
+            const newSortOrder = maxSortOrder + 1;
             const newItem = {
                 id: Date.now(),
                 code: code,
@@ -288,7 +294,8 @@ function renderDashboard() {
                 pdfUrl: resolvedPdfUrl,
                 quantity: 1,
                 multiplier: 100,
-                note: ''
+                note: '',
+                sort_order: newSortOrder // <-- Добавляем порядковый номер в конец списка
             };
             const { error } = yield supabaseClient.from(TABLE_NAME).insert([newItem]);
             if (error) {
@@ -393,15 +400,18 @@ function renderDashboard() {
                     : '';
                 tableContent += `
           <div data-id="${item.id}" class="draggable-row flex flex-col xl:flex-row items-start xl:items-center justify-between p-4 bg-white rounded-2xl border border-stone-200/80 border-l-4 ${borderAccentClass} shadow-sm transition-all hover:shadow-md gap-4">
-            <div class="flex items-center space-x-3 w-full xl:w-auto overflow-hidden">
+                      <div class="flex items-center space-x-3 w-full xl:w-auto overflow-hidden">
               <!-- Кнопки перемещения вверх / вниз -->
               <div class="flex flex-col space-y-0.5 no-print">
                 <button onclick="moveItemUp(${item.id})" class="text-stone-400 hover:text-stone-700 text-xs px-1" title="Move Up">▲</button>
                 <button onclick="moveItemDown(${item.id})" class="text-stone-400 hover:text-stone-700 text-xs px-1" title="Move Down">▼</button>
               </div>
-            
-                              <a href="${item.pdfUrl}" target="_blank" title="Open PDF" class="group flex items-center space-x-1.5 bg-stone-50 hover:bg-blue-50 px-3 py-1.5 rounded-xl border border-stone-200 transition-colors shrink-0">
-                <span class="font-mono font-bold text-blue-600 text-sm">${item.code}</span>
+              
+              <!-- Нумерация позиции (1, 2, 3...) -->
+              <span class="text-stone-600 font-bold text-xs w-7 h-7 flex items-center justify-center bg-stone-100 border border-stone-200 rounded-lg shrink-0">${index + 1}</span>
+              
+              <a href="${item.pdfUrl}" target="_blank" title="Open PDF" class="group flex items-center space-x-1.5 bg-stone-50 hover:bg-blue-50 px-3 py-1.5 rounded-xl border border-stone-200 transition-colors shrink-0">
+    <span class="font-mono font-bold text-blue-600 text-sm">${item.code}</span>
                 <span class="text-xs text-stone-400 group-hover:text-blue-600">📄</span>
               </a>
               ${secondFileHtml}
@@ -504,7 +514,7 @@ function renderDashboard() {
             }
         }));
     });
-} // <-- Функция renderDashboard() должна закрываться ТОЛЬКО ЗДЕСЬ!
+}
 // ==========================================
 // Функции управления порядком (стрелочки)
 // ==========================================

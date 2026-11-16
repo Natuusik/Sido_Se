@@ -241,27 +241,19 @@
           <tbody>
       `;
 
-      rows.forEach((row, index) => {
+           rows.forEach((row, index) => {
         const calcInputs = row.querySelectorAll('.item-calc-input');
         const qty = calcInputs[0] ? calcInputs[0].value : '1';
         const mult = calcInputs[1] ? calcInputs[1].value : '100';
         const total = (Number(qty) * Number(mult)) || 0;
 
-        const clone = row.cloneNode(true);
-        clone.querySelectorAll('button, input, svg').forEach(el => el.remove());
+        // 1. Берем код товара напрямую из ссылки PDF (только текст кода, без иконки 📄)
+        const codeEl = row.querySelector('a span.font-mono');
+        const code = codeEl ? codeEl.textContent.trim() : '';
 
-        const textParts = [];
-        const walker = document.createTreeWalker(clone, NodeFilter.SHOW_TEXT, null, false);
-        let node;
-        while ((node = walker.nextNode())) {
-          const txt = node.nodeValue.replace(/[⋮⋮⠿×x*=]/g, '').trim();
-          if (txt && txt !== String(index + 1) && txt !== String(total)) {
-            textParts.push(txt);
-          }
-        }
-
-        const code = textParts.length > 1 ? textParts.slice(0, 1).join('') : '';
-        const title = textParts.length > 1 ? textParts.slice(1).join(' ') : (textParts[0] || '');
+        // 2. Берем название товара напрямую из блока с названием (сохраняя 333x350 и подчеркивание слова Black)
+        const titleEl = row.querySelector('div.font-medium');
+        const title = titleEl ? titleEl.innerHTML.trim() : '';
 
         htmlTable += `
           <tr>
