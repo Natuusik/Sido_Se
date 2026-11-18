@@ -1,13 +1,5 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
+Object.defineProperty(exports, "__esModule", { value: true });
 const SUPABASE_URL = 'https://vuppdvlpsbyzhcmalhoi.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_frIjzGAOaW77jegazxN-_Q_OUqN-hzO';
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -119,72 +111,68 @@ function formatTitle(title) {
 // ==========================================
 // 3. Работа с Supabase (Загрузка задач + Время)
 // ==========================================
-function fetchItemsFromSupabase() {
-    return __awaiter(this, void 0, void 0, function* () {
-        try {
-            const { data: taskData, error: taskError } = yield supabaseClient.from(TABLE_NAME).select('*');
-            if (taskError) {
-                console.error('Supabase tasks error:', taskError.message);
-            }
-            else if (taskData) {
-                items = taskData;
-            }
-            const { data: timeData, error: timeError } = yield supabaseClient
-                .from('app_settings')
-                .select('last_update_time')
-                .eq('id', 1)
-                .single();
-            if (!timeError && timeData && timeData.last_update_time) {
-                lastUpdateTime = new Date(timeData.last_update_time);
-            }
-            else {
-                lastUpdateTime = null;
-            }
+async function fetchItemsFromSupabase() {
+    try {
+        const { data: taskData, error: taskError } = await supabaseClient.from(TABLE_NAME).select('*');
+        if (taskError) {
+            console.error('Supabase tasks error:', taskError.message);
         }
-        catch (err) {
-            console.error('Fetch exception:', err);
+        else if (taskData) {
+            items = taskData;
         }
-        finally {
-            renderDashboard();
-            renderLastUpdateTime();
+        const { data: timeData, error: timeError } = await supabaseClient
+            .from('app_settings')
+            .select('last_update_time')
+            .eq('id', 1)
+            .single();
+        if (!timeError && timeData && timeData.last_update_time) {
+            lastUpdateTime = new Date(timeData.last_update_time);
         }
-    });
+        else {
+            lastUpdateTime = null;
+        }
+    }
+    catch (err) {
+        console.error('Fetch exception:', err);
+    }
+    finally {
+        renderDashboard();
+        renderLastUpdateTime();
+    }
 }
 // Глобальная функция для кнопки "Done"
-window.markAsReady = function (itemId) {
-    return __awaiter(this, void 0, void 0, function* () {
-        try {
-            // 1. Находим элемент в локальном массиве
-            const item = items.find(i => i.id === itemId);
-            if (!item)
-                return;
-            // 2. Вычисляем следующий sort_order для секции 'ready' (чтобы встал в самый конец готовых)
-            const readyItems = items.filter(i => i.status === 'ready');
-            const maxSortOrder = readyItems.length > 0
-                ? Math.max(...readyItems.map(i => { var _a; return (_a = i.sort_order) !== null && _a !== void 0 ? _a : 0; }))
-                : -1;
-            const newSortOrder = maxSortOrder + 1;
-            // 3. Обновляем статус и новый порядок в Supabase
-            const { error } = yield supabaseClient
-                .from(TABLE_NAME)
-                .update({
-                status: 'ready',
-                sort_order: newSortOrder
-            })
-                .eq('id', itemId);
-            if (error) {
-                console.error('Ошибка Supabase:', error);
-                alert('Не удалось обновить статус: ' + error.message);
-            }
-            else {
-                // 4. Перезагружаем актуальные данные с сервера и перерисовываем дашборд
-                yield fetchItemsFromSupabase();
-            }
+window.markAsReady = async function (itemId) {
+    try {
+        // 1. Находим элемент в локальном массиве
+        const item = items.find(i => i.id === itemId);
+        if (!item)
+            return;
+        // 2. Вычисляем следующий sort_order для секции 'ready' (чтобы встал в самый конец готовых)
+        const readyItems = items.filter(i => i.status === 'ready');
+        const maxSortOrder = readyItems.length > 0
+            ? Math.max(...readyItems.map(i => i.sort_order ?? 0))
+            : -1;
+        const newSortOrder = maxSortOrder + 1;
+        // 3. Обновляем статус и новый порядок в Supabase
+        const { error } = await supabaseClient
+            .from(TABLE_NAME)
+            .update({
+            status: 'ready',
+            sort_order: newSortOrder
+        })
+            .eq('id', itemId);
+        if (error) {
+            console.error('Ошибка Supabase:', error);
+            alert('Не удалось обновить статус: ' + error.message);
         }
-        catch (err) {
-            console.error('Ошибка в markAsReady:', err);
+        else {
+            // 4. Перезагружаем актуальные данные с сервера и перерисовываем дашборд
+            await fetchItemsFromSupabase();
         }
-    });
+    }
+    catch (err) {
+        console.error('Ошибка в markAsReady:', err);
+    }
 };
 // Функция редактирования карточки (Карандашик)
 window.editItemModal = function (itemId) {
@@ -270,7 +258,7 @@ function renderDashboard() {
     }
     const addItemForm = document.getElementById('add-item-form');
     if (addItemForm) {
-        addItemForm.addEventListener('submit', (e) => __awaiter(this, void 0, void 0, function* () {
+        addItemForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const cInput = document.getElementById('product-code');
             const tInput = document.getElementById('product-title');
@@ -283,7 +271,7 @@ function renderDashboard() {
             // Вычисляем следующий порядковый номер для секции 'process'
             const processItems = items.filter(i => i.status === 'process');
             const maxSortOrder = processItems.length > 0
-                ? Math.max(...processItems.map(i => { var _a; return (_a = i.sort_order) !== null && _a !== void 0 ? _a : 0; }))
+                ? Math.max(...processItems.map(i => i.sort_order ?? 0))
                 : -1;
             const newSortOrder = maxSortOrder + 1;
             const newItem = {
@@ -297,7 +285,7 @@ function renderDashboard() {
                 note: '',
                 sort_order: newSortOrder // <-- Добавляем порядковый номер в конец списка
             };
-            const { error } = yield supabaseClient.from(TABLE_NAME).insert([newItem]);
+            const { error } = await supabaseClient.from(TABLE_NAME).insert([newItem]);
             if (error) {
                 console.error('Error inserting item:', error.message);
                 alert('Ошибка сохранения в Supabase: ' + error.message);
@@ -305,9 +293,9 @@ function renderDashboard() {
             else {
                 cInput.value = '';
                 tInput.value = '';
-                yield fetchItemsFromSupabase();
+                await fetchItemsFromSupabase();
             }
-        }));
+        });
     }
     const targetSections = [
         {
@@ -326,7 +314,7 @@ function renderDashboard() {
     targetSections.forEach(section => {
         const groupItems = items
             .filter(item => item.status === section.key)
-            .sort((a, b) => { var _a, _b; return ((_a = a.sort_order) !== null && _a !== void 0 ? _a : 0) - ((_b = b.sort_order) !== null && _b !== void 0 ? _b : 0); });
+            .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
         const count = groupItems.length;
         const sectionDiv = document.createElement('div');
         sectionDiv.id = `${section.key}-section`;
@@ -352,7 +340,6 @@ function renderDashboard() {
         else {
             tableContent += `<div class="space-y-3 task-list-container" data-section="${section.key}">`;
             groupItems.forEach((item, index) => {
-                var _a, _b, _c;
                 let actionButton = '';
                 if (section.key === 'process') {
                     actionButton = `<button onclick="markAsReady(${item.id})" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-xl text-xs font-semibold transition-colors shadow-sm shrink-0">✅ Done</button>`;
@@ -371,14 +358,14 @@ function renderDashboard() {
                 else if (text.indexOf('INKJET') !== -1 || text.indexOf('LAZER') !== -1 || text.indexOf('LASER') !== -1) {
                     borderAccentClass = 'border-l-purple-500 hover:bg-purple-50/50';
                 }
-                const currentQty = (_a = item.quantity) !== null && _a !== void 0 ? _a : 1;
-                const currentMultiplier = (_b = item.multiplier) !== null && _b !== void 0 ? _b : 100;
+                const currentQty = item.quantity ?? 1;
+                const currentMultiplier = item.multiplier ?? 100;
                 const rowTotal = currentQty * currentMultiplier; // Исправлено умножение
-                const currentNote = (_c = item.note) !== null && _c !== void 0 ? _c : '';
+                const currentNote = item.note ?? '';
                 // Проверяем, есть ли у товара второй PDF в справочнике
                 const catalogEntry = catalogDatabase.find(c => c.code === item.code);
                 let secondFileHtml = '';
-                if (catalogEntry === null || catalogEntry === void 0 ? void 0 : catalogEntry.pdfUrl2) {
+                if (catalogEntry?.pdfUrl2) {
                     const isWord = catalogEntry.pdfUrl2.toLowerCase().endsWith('.doc') || catalogEntry.pdfUrl2.toLowerCase().endsWith('.docx');
                     const labelText = isWord ? 'Word' : 'Label';
                     const icon = isWord ? '📝' : '📄';
@@ -448,7 +435,7 @@ function renderDashboard() {
     });
     // 1. Привязка инпутов калькулятора (ВНУТРИ renderDashboard!)
     document.querySelectorAll('.item-calc-input').forEach(input => {
-        input.addEventListener('change', (e) => __awaiter(this, void 0, void 0, function* () {
+        input.addEventListener('change', async (e) => {
             const target = e.target;
             const id = Number(target.getAttribute('data-id'));
             const field = target.getAttribute('data-field');
@@ -460,17 +447,17 @@ function renderDashboard() {
             try {
                 const updateObj = {};
                 updateObj[field] = val;
-                yield supabaseClient.from(TABLE_NAME).update(updateObj).eq('id', id);
+                await supabaseClient.from(TABLE_NAME).update(updateObj).eq('id', id);
             }
             catch (err) {
                 console.error('Error updating in Supabase:', err);
             }
             renderDashboard();
-        }));
+        });
     });
     // 2. Привязка инпутов пометок (Note) (ВНУТРИ renderDashboard!)
     document.querySelectorAll('.item-note-input').forEach(input => {
-        input.addEventListener('change', (e) => __awaiter(this, void 0, void 0, function* () {
+        input.addEventListener('change', async (e) => {
             const target = e.target;
             const id = Number(target.getAttribute('data-id'));
             const val = target.value;
@@ -479,16 +466,16 @@ function renderDashboard() {
                 targetItem.note = val;
             }
             try {
-                yield supabaseClient.from(TABLE_NAME).update({ note: val }).eq('id', id);
+                await supabaseClient.from(TABLE_NAME).update({ note: val }).eq('id', id);
             }
             catch (err) {
                 console.error('Error updating note in Supabase:', err);
             }
-        }));
+        });
     });
     // 3. Привязка кнопок удаления (.delete-btn) (ВНУТРИ renderDashboard!)
     document.querySelectorAll('.delete-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => __awaiter(this, void 0, void 0, function* () {
+        btn.addEventListener('click', async (e) => {
             const target = e.currentTarget;
             const id = Number(target.getAttribute('data-id'));
             if (!id)
@@ -496,7 +483,7 @@ function renderDashboard() {
             if (!confirm('Удалить эту позицию?'))
                 return;
             try {
-                const { error } = yield supabaseClient
+                const { error } = await supabaseClient
                     .from(TABLE_NAME)
                     .delete()
                     .eq('id', id);
@@ -512,112 +499,104 @@ function renderDashboard() {
             catch (err) {
                 console.error('Исключение при удалении:', err);
             }
-        }));
+        });
     });
 }
 // ==========================================
 // Функции управления порядком (стрелочки)
 // ==========================================
-window.moveItemUp = function (itemId) {
-    return __awaiter(this, void 0, void 0, function* () {
-        const item = items.find(i => i.id === itemId);
-        if (!item)
-            return;
-        const sectionItems = items
-            .filter(i => i.status === item.status)
-            .sort((a, b) => { var _a, _b; return ((_a = a.sort_order) !== null && _a !== void 0 ? _a : 0) - ((_b = b.sort_order) !== null && _b !== void 0 ? _b : 0); });
-        const index = sectionItems.findIndex(i => i.id === itemId);
-        if (index <= 0)
-            return;
-        sectionItems.splice(index, 1);
-        sectionItems.splice(index - 1, 0, item);
-        sectionItems.forEach((it, idx) => {
-            it.sort_order = idx;
-        });
-        const otherItems = items.filter(i => i.status !== item.status);
-        items = [...otherItems, ...sectionItems];
-        yield saveOrderAndRefresh();
+window.moveItemUp = async function (itemId) {
+    const item = items.find(i => i.id === itemId);
+    if (!item)
+        return;
+    const sectionItems = items
+        .filter(i => i.status === item.status)
+        .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+    const index = sectionItems.findIndex(i => i.id === itemId);
+    if (index <= 0)
+        return;
+    sectionItems.splice(index, 1);
+    sectionItems.splice(index - 1, 0, item);
+    sectionItems.forEach((it, idx) => {
+        it.sort_order = idx;
     });
+    const otherItems = items.filter(i => i.status !== item.status);
+    items = [...otherItems, ...sectionItems];
+    await saveOrderAndRefresh();
 };
-window.moveItemDown = function (itemId) {
-    return __awaiter(this, void 0, void 0, function* () {
-        const item = items.find(i => i.id === itemId);
-        if (!item)
-            return;
-        const sectionItems = items
-            .filter(i => i.status === item.status)
-            .sort((a, b) => { var _a, _b; return ((_a = a.sort_order) !== null && _a !== void 0 ? _a : 0) - ((_b = b.sort_order) !== null && _b !== void 0 ? _b : 0); });
-        const index = sectionItems.findIndex(i => i.id === itemId);
-        if (index === -1 || index >= sectionItems.length - 1)
-            return;
-        sectionItems.splice(index, 1);
-        sectionItems.splice(index + 1, 0, item);
-        sectionItems.forEach((it, idx) => {
-            it.sort_order = idx;
-        });
-        const otherItems = items.filter(i => i.status !== item.status);
-        items = [...otherItems, ...sectionItems];
-        yield saveOrderAndRefresh();
+window.moveItemDown = async function (itemId) {
+    const item = items.find(i => i.id === itemId);
+    if (!item)
+        return;
+    const sectionItems = items
+        .filter(i => i.status === item.status)
+        .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+    const index = sectionItems.findIndex(i => i.id === itemId);
+    if (index === -1 || index >= sectionItems.length - 1)
+        return;
+    sectionItems.splice(index, 1);
+    sectionItems.splice(index + 1, 0, item);
+    sectionItems.forEach((it, idx) => {
+        it.sort_order = idx;
     });
+    const otherItems = items.filter(i => i.status !== item.status);
+    items = [...otherItems, ...sectionItems];
+    await saveOrderAndRefresh();
 };
-function saveOrderAndRefresh() {
-    return __awaiter(this, void 0, void 0, function* () {
-        try {
-            for (const item of items) {
-                yield supabaseClient
-                    .from(TABLE_NAME)
-                    .update({ sort_order: item.sort_order })
-                    .eq('id', item.id);
-            }
+async function saveOrderAndRefresh() {
+    try {
+        for (const item of items) {
+            await supabaseClient
+                .from(TABLE_NAME)
+                .update({ sort_order: item.sort_order })
+                .eq('id', item.id);
         }
-        catch (err) {
-            console.warn('Ошибка сохранения порядка в базу:', err);
-        }
-        renderDashboard();
-    });
+    }
+    catch (err) {
+        console.warn('Ошибка сохранения порядка в базу:', err);
+    }
+    renderDashboard();
 }
 // ==========================================
 // 5. Логика кнопки "Refresh"
 // ==========================================
-function handleRefreshClick() {
-    return __awaiter(this, void 0, void 0, function* () {
-        const refreshBtn = document.getElementById('refresh-btn');
+async function handleRefreshClick() {
+    const refreshBtn = document.getElementById('refresh-btn');
+    if (refreshBtn) {
+        refreshBtn.disabled = true;
+        refreshBtn.style.opacity = '0.6';
+    }
+    const now = new Date();
+    try {
+        const { error } = await supabaseClient
+            .from('app_settings')
+            .update({ last_update_time: now.toISOString() })
+            .eq('id', 1);
+        if (error) {
+            console.error('Ошибка сохранения времени в базу:', error);
+        }
+        else {
+            lastUpdateTime = now;
+            renderLastUpdateTime();
+        }
+        const { data: taskData, error: taskError } = await supabaseClient.from(TABLE_NAME).select('*');
+        if (taskError) {
+            console.error('Ошибка загрузки задач:', taskError.message);
+        }
+        else if (taskData) {
+            items = taskData;
+            renderDashboard();
+        }
+    }
+    catch (err) {
+        console.error('Ошибка рефреша:', err);
+    }
+    finally {
         if (refreshBtn) {
-            refreshBtn.disabled = true;
-            refreshBtn.style.opacity = '0.6';
+            refreshBtn.disabled = false;
+            refreshBtn.style.opacity = '1';
         }
-        const now = new Date();
-        try {
-            const { error } = yield supabaseClient
-                .from('app_settings')
-                .update({ last_update_time: now.toISOString() })
-                .eq('id', 1);
-            if (error) {
-                console.error('Ошибка сохранения времени в базу:', error);
-            }
-            else {
-                lastUpdateTime = now;
-                renderLastUpdateTime();
-            }
-            const { data: taskData, error: taskError } = yield supabaseClient.from(TABLE_NAME).select('*');
-            if (taskError) {
-                console.error('Ошибка загрузки задач:', taskError.message);
-            }
-            else if (taskData) {
-                items = taskData;
-                renderDashboard();
-            }
-        }
-        catch (err) {
-            console.error('Ошибка рефреша:', err);
-        }
-        finally {
-            if (refreshBtn) {
-                refreshBtn.disabled = false;
-                refreshBtn.style.opacity = '1';
-            }
-        }
-    });
+    }
 }
 if (refreshButton) {
     refreshButton.addEventListener('click', handleRefreshClick);

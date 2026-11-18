@@ -1,6 +1,7 @@
 // ==========================================
 // 1. Инициализация и настройки Supabase
 // ==========================================
+export {}; // <--- Добавьте эту строчку
 declare const supabase: any;
 
 const SUPABASE_URL = 'https://vuppdvlpsbyzhcmalhoi.supabase.co';
