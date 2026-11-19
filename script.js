@@ -2,6 +2,7 @@ const SUPABASE_URL = 'https://vuppdvlpsbyzhcmalhoi.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_frIjzGAOaW77jegazxN-_Q_OUqN-hzO';
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const TABLE_NAME = 'sidose_tasks';
+const ARCHIVE_TABLE_NAME = 'shipment_archives';
 // Элементы интерфейса
 const refreshButton = document.getElementById('refresh-btn');
 const lastUpdateDiv = document.getElementById('last-update-time');
@@ -239,13 +240,193 @@ window.editItemModal = function (itemId) {
     });
 };
 // ==========================================
-// Модальное окно для заметок (с красным акцентом)
+// Функция отправки (архивации) готовых товаров
+// ==========================================
+window.shipCompletedGoods = async function () {
+    const readyItems = items.filter(i => i.status === 'ready');
+    if (readyItems.length === 0) {
+        alert('Нет готовых товаров для отправки!');
+        return;
+    }
+    const batchName = prompt("Введите название или дату отправки (например: Партия от 26.11.2026):", `Отправка ${new Date().toLocaleDateString()}`);
+    if (!batchName)
+        return;
+    try {
+        // 1. Сохраняем в таблицу архива
+        const archivePayload = {
+            batch_name: batchName.trim(),
+            items_json: readyItems,
+            total_items: readyItems.length
+        };
+        const { error: archiveError } = await supabaseClient.from(ARCHIVE_TABLE_NAME).insert([archivePayload]);
+        if (archiveError) {
+            alert('Ошибка при сохранении в архив: ' + archiveError.message);
+            return;
+        }
+        // 2. Удаляем отправленные товары из основной таблицы задач навсегда (или помечаем)
+        for (const item of readyItems) {
+            await supabaseClient.from(TABLE_NAME).delete().eq('id', item.id);
+        }
+        alert('Партия успешно отправлена в архив и очищена с экрана!');
+        await updateLastModifiedTime();
+        await fetchItemsFromSupabase();
+    }
+    catch (err) {
+        console.error('Ошибка отправки партии:', err);
+        alert('Произошла ошибка при отправке.');
+    }
+};
+// ==========================================
+// Открытие модального окна архива отправок
+// ==========================================
+window.openShipmentArchiveModal = async function () {
+    const existingModal = document.getElementById('archive-modal-overlay');
+    if (existingModal)
+        existingModal.remove();
+    const overlay = document.createElement('div');
+    overlay.id = 'archive-modal-overlay';
+    overlay.className = 'fixed inset-0 bg-stone-900/50 backdrop-blur-xs flex items-center justify-center z-50 p-4';
+    overlay.innerHTML = `
+    <div class="bg-white rounded-3xl p-6 md:p-8 max-w-3xl w-full border border-stone-200 shadow-2xl space-y-4 max-h-[85vh] flex flex-col">
+      <div class="flex items-center justify-between border-b border-stone-100 pb-3">
+        <h3 class="text-lg font-bold text-stone-900 flex items-center space-x-2">
+          <span>📁 Архив отправок и партий</span>
+        </h3>
+        <button onclick="document.getElementById('archive-modal-overlay').remove()" class="text-stone-400 hover:text-stone-700 text-lg font-bold px-2 py-1">✕</button>
+      </div>
+      
+      <div id="archive-list-content" class="overflow-y-auto space-y-3 flex-1 pr-1">
+        <p class="text-stone-400 text-sm italic text-center py-6">Загрузка архива...</p>
+      </div>
+
+      <div class="flex items-center justify-end pt-2 border-t border-stone-100">
+        <button onclick="document.getElementById('archive-modal-overlay').remove()" class="bg-stone-800 hover:bg-stone-900 text-white text-xs font-semibold px-5 py-2.5 rounded-xl transition-colors">Закрыть</button>
+      </div>
+    </div>
+  `;
+    document.body.appendChild(overlay);
+    // Загружаем архивы из базы
+    try {
+        const { data, error } = await supabaseClient.from(ARCHIVE_TABLE_NAME).select('*').order('shipped_at', { ascending: false });
+        const contentContainer = document.getElementById('archive-list-content');
+        if (!contentContainer)
+            return;
+        if (error || !data || data.length === 0) {
+            contentContainer.innerHTML = `<p class="text-stone-400 text-sm italic text-center py-6">Архив отправок пуст.</p>`;
+            return;
+        }
+        let html = '';
+        data.forEach((batch) => {
+            const dateFormatted = new Date(batch.shipped_at).toLocaleString();
+            const itemsList = batch.items_json || [];
+            let itemsTableHtml = '';
+            itemsList.forEach((it, idx) => {
+                const rowTotal = (it.quantity ?? 1) * (it.multiplier ?? 100);
+                itemsTableHtml += `
+          <tr class="border-b border-stone-100 text-xs">
+            <td class="py-1.5 px-2 text-center font-bold text-stone-500">${idx + 1}</td>
+            <td class="py-1.5 px-2 font-mono font-bold">${it.code}</td>
+            <td class="py-1.5 px-2">${it.title}</td>
+            <td class="py-1.5 px-2 text-right">${it.quantity ?? 1} × ${it.multiplier ?? 100}</td>
+            <td class="py-1.5 px-2 text-right font-bold text-blue-600">${rowTotal}</td>
+          </tr>
+        `;
+            });
+            html += `
+        <div class="border border-stone-200 rounded-2xl p-4 bg-stone-50/50 space-y-3">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-stone-200/60 pb-2">
+            <div>
+              <h4 class="font-bold text-stone-900 text-sm">${batch.batch_name}</h4>
+              <p class="text-xs text-stone-500">Дата отправки: ${dateFormatted} | Позиций: ${batch.total_items}</p>
+            </div>
+            <button onclick="printArchiveBatch(${batch.id})" class="bg-stone-800 hover:bg-stone-900 text-white text-xs px-3 py-1.5 rounded-xl font-medium transition-colors shadow-sm self-start sm:self-auto">🖨️ Печать / PDF отчета</button>
+          </div>
+          <table class="w-full text-left bg-white rounded-xl overflow-hidden border border-stone-200">
+            <thead class="bg-stone-100 text-[11px] text-stone-600 uppercase">
+              <tr>
+                <th class="py-1.5 px-2 text-center w-8">№</th>
+                <th class="py-1.5 px-2 w-24">Code</th>
+                <th class="py-1.5 px-2">Title</th>
+                <th class="py-1.5 px-2 text-right w-24">Calculation</th>
+                <th class="py-1.5 px-2 text-right w-20">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${itemsTableHtml}
+            </tbody>
+          </table>
+        </div>
+      `;
+        });
+        contentContainer.innerHTML = html;
+        // Сохраняем данные архива глобально для печати
+        window.cachedArchiveData = data;
+    }
+    catch (err) {
+        console.error('Ошибка загрузки архива:', err);
+        const contentContainer = document.getElementById('archive-list-content');
+        if (contentContainer) {
+            contentContainer.innerHTML = `<p class="text-rose-500 text-sm text-center py-6">Ошибка загрузки данных из базы.</p>`;
+        }
+    }
+};
+// Функция печати конкретной архивной партии в красивый PDF
+window.printArchiveBatch = function (batchId) {
+    const data = window.cachedArchiveData;
+    if (!data)
+        return;
+    const batch = data.find((b) => b.id === batchId);
+    if (!batch)
+        return;
+    const dateFormatted = new Date(batch.shipped_at).toLocaleString();
+    let tableRowsHtml = '';
+    batch.items_json.forEach((it, index) => {
+        const total = (it.quantity ?? 1) * (it.multiplier ?? 100);
+        tableRowsHtml += `
+      <tr>
+        <td class="col-num">${index + 1}</td>
+        <td class="col-code">${it.code}</td>
+        <td class="col-title">${it.title}</td>
+        <td class="col-qty">${it.quantity ?? 1}</td>
+        <td class="col-mult">${it.multiplier ?? 100}</td>
+        <td class="col-total">${total}</td>
+      </tr>
+    `;
+    });
+    let printArea = document.getElementById('custom-print-area');
+    if (!printArea) {
+        printArea = document.createElement('div');
+        printArea.id = 'custom-print-area';
+        document.body.appendChild(printArea);
+    }
+    printArea.innerHTML = `
+    <h2>Отчет по отправке: ${batch.batch_name}</h2>
+    <p style="font-size: 12px; color: #4b5563; margin-bottom: 10px;">Дата архивации: ${dateFormatted} | Всего позиций: ${batch.total_items}</p>
+    <table>
+      <thead>
+        <tr>
+          <th class="col-num">№</th>
+          <th class="col-code">Code</th>
+          <th class="col-title">Product Title</th>
+          <th class="col-qty">Qty</th>
+          <th class="col-mult">Mult.</th>
+          <th class="col-total">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${tableRowsHtml}
+      </tbody>
+    </table>
+  `;
+    window.print();
+};
+// ==========================================
+// Модальное окно для заметок
 // ==========================================
 window.openNoteModal = function (itemId) {
     const item = items.find(i => i.id === itemId);
     if (!item)
         return;
-    // Создаем модальное окно поверх страницы
     const existingModal = document.getElementById('note-modal-overlay');
     if (existingModal)
         existingModal.remove();
@@ -411,13 +592,20 @@ function renderDashboard() {
         const undoButtonHtml = hasDeletedItems
             ? `<button onclick="undoLastDelete()" class="bg-amber-600 hover:bg-amber-700 text-white text-xs px-3.5 py-2 rounded-xl font-medium transition-colors shadow-sm flex items-center space-x-1" title="Вернуть последнее удаление"><span>↩️ Undo</span></button>`
             : '';
-        const actionButtonsHtml = (count > 0 || hasDeletedItems)
-            ? `<div class="flex flex-wrap items-center gap-2 no-print">
-          ${undoButtonHtml}
-          <button id="print-${section.key}-table" class="bg-stone-800 hover:bg-stone-900 text-white text-xs px-3.5 py-2 rounded-xl font-medium transition-colors shadow-sm flex items-center space-x-1"><span>🖨️ Print / PDF</span></button>
-          <button id="copy-${section.key}-table" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3.5 py-2 rounded-xl font-medium transition-colors shadow-sm flex items-center space-x-1"><span>📋 To Word</span></button>
-         </div>`
-            : '';
+        // Если это секция Completed Goods и в ней есть товары, добавляем кнопку "Зафиксировать отправку" и кнопку архива
+        let specialActionButtons = '';
+        if (section.key === 'ready' && count > 0) {
+            specialActionButtons = `<button onclick="shipCompletedGoods()" class="bg-emerald-700 hover:bg-emerald-800 text-white text-xs px-3.5 py-2 rounded-xl font-medium transition-colors shadow-sm flex items-center space-x-1" title="Отправить партию в архив и очистить экран"><span>📦 Зафиксировать отправку</span></button>`;
+        }
+        // Кнопка доступа ко всем прошлым архивам отправок
+        let archiveHistoryBtn = `<button onclick="openShipmentArchiveModal()" class="bg-stone-700 hover:bg-stone-800 text-white text-xs px-3.5 py-2 rounded-xl font-medium transition-colors shadow-sm flex items-center space-x-1" title="Посмотреть архив отправок за месяц"><span>📁 Архив отправок</span></button>`;
+        const actionButtonsHtml = `<div class="flex flex-wrap items-center gap-2 no-print">
+        ${archiveHistoryBtn}
+        ${undoButtonHtml}
+        ${specialActionButtons}
+        <button id="print-${section.key}-table" class="bg-stone-800 hover:bg-stone-900 text-white text-xs px-3.5 py-2 rounded-xl font-medium transition-colors shadow-sm flex items-center space-x-1"><span>🖨️ Print / PDF</span></button>
+        <button id="copy-${section.key}-table" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3.5 py-2 rounded-xl font-medium transition-colors shadow-sm flex items-center space-x-1"><span>📋 To Word</span></button>
+       </div>`;
         let tableContent = `
       <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div class="flex items-center space-x-3">
@@ -471,7 +659,6 @@ function renderDashboard() {
             </a>
           `;
                 }
-                // Кнопка комментариев вместо постоянного поля ввода заметки (подсвечивается красным, если заметка есть)
                 const noteBtnClass = hasNote
                     ? 'bg-rose-600 text-white border-rose-600 hover:bg-rose-700 shadow-sm'
                     : 'bg-stone-50 text-stone-400 hover:text-rose-600 border-stone-200 hover:bg-rose-50';
