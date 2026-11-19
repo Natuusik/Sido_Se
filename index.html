@@ -148,20 +148,17 @@
         const total = (Number(qty) * Number(mult)) || 0;
 
         const clone = row.cloneNode(true);
-        clone.querySelectorAll('button, input, svg').forEach(el => el.remove());
+        
+        // УДАЛЯЕМ ВСЁ ЛИШНЕЕ ПРИ ПЕЧАТИ: кнопки, иконки файлов, значки, стрелочки и т.д.
+        clone.querySelectorAll('button, input, svg, a, span.text-stone-400, .group').forEach(el => el.remove());
 
-        const textParts = [];
-        const walker = document.createTreeWalker(clone, NodeFilter.SHOW_TEXT, null, false);
-        let node;
-        while ((node = walker.nextNode())) {
-          const txt = node.nodeValue.replace(/[⋮⋮⠿×x*=▲▼]/g, '').trim();
-          if (txt && txt !== String(index + 1) && txt !== String(total) && txt !== 'Label' && txt !== 'Word') {
-            textParts.push(txt);
-          }
-        }
+        // Извлекаем чистый код и название товара
+        const codeEl = row.querySelector('a span.font-mono');
+        const code = codeEl ? codeEl.textContent.trim() : '';
 
-        const code = textParts.length > 1 ? textParts[0] : '';
-        const title = textParts.length > 1 ? textParts.slice(1).join(' ') : (textParts[0] || '');
+        const titleEl = row.querySelector('div.font-medium');
+        // Очищаем название от тегов стилей черноты, если они там есть
+        const title = titleEl ? titleEl.textContent.trim() : '';
 
         tableRowsHtml += `
           <tr>
@@ -218,7 +215,6 @@
         sectionTitle = 'Completed Goods';
       } else if (sectionId.includes('process')) {
         sectionTitle = 'In Progress';
-     
       }
 
       const rows = Array.from(section.querySelectorAll('.draggable-row'));
