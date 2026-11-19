@@ -138,7 +138,6 @@ function renderLastUpdateTime(): void {
   timeContainer.innerText = `Updated: ${day}.${month}.${year} ${hours}:${minutes}:${seconds}`;
 }
 
-// Вспомогательная функция для записи нового времени изменения в базу Supabase
 async function updateLastModifiedTime(): Promise<void> {
   const now = new Date();
   try {
@@ -216,7 +215,7 @@ async function fetchItemsFromSupabase(): Promise<void> {
       console.error('Ошибка Supabase:', error);
       alert('Не удалось обновить статус: ' + error.message);
     } else {
-      await updateLastModifiedTime(); // Обновляем время при переносе в готовые
+      await updateLastModifiedTime();
       await fetchItemsFromSupabase();
     }
   } catch (err) {
@@ -224,7 +223,6 @@ async function fetchItemsFromSupabase(): Promise<void> {
   }
 };
 
-// Функция отмены удаления (Undo)
 (window as any).undoLastDelete = async function() {
   const deletedItems = items.filter(i => i.status === 'deleted');
   if (deletedItems.length === 0) return;
@@ -241,7 +239,7 @@ async function fetchItemsFromSupabase(): Promise<void> {
       console.error('Ошибка отмены удаления:', error);
       alert('Не удалось восстановить позицию: ' + error.message);
     } else {
-      await updateLastModifiedTime(); // Обновляем время при возврате
+      await updateLastModifiedTime();
       await fetchItemsFromSupabase();
     }
   } catch (err) {
@@ -279,10 +277,73 @@ async function fetchItemsFromSupabase(): Promise<void> {
         console.error("Ошибка обновления:", error);
         alert("Не удалось сохранить изменения в базе.");
       } else {
-        await updateLastModifiedTime(); // Обновляем время при редактировании
+        await updateLastModifiedTime();
       }
       renderDashboard();
     });
+};
+
+// ==========================================
+// Модальное окно для заметок (с красным акцентом)
+// ==========================================
+(window as any).openNoteModal = function(itemId: number) {
+  const item = items.find(i => i.id === itemId);
+  if (!item) return;
+
+  // Создаем модальное окно поверх страницы
+  const existingModal = document.getElementById('note-modal-overlay');
+  if (existingModal) existingModal.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'note-modal-overlay';
+  overlay.className = 'fixed inset-0 bg-stone-900/50 backdrop-blur-xs flex items-center justify-center z-50 p-4';
+  
+  overlay.innerHTML = `
+    <div class="bg-white rounded-3xl p-6 md:p-8 max-w-lg w-full border border-red-200 shadow-2xl space-y-4 animate-in fade-in zoom-in duration-150">
+      <div class="flex items-center justify-between border-b border-stone-100 pb-3">
+        <h3 class="text-base font-bold text-stone-900 flex items-center space-x-2">
+          <span class="w-3 h-3 rounded-full bg-rose-600 inline-block"></span>
+          <span>Заметка к позиции: <span class="text-rose-600 font-mono">${item.code}</span></span>
+        </h3>
+        <button onclick="document.getElementById('note-modal-overlay').remove()" class="text-stone-400 hover:text-stone-700 text-lg font-bold px-2 py-1">✕</button>
+      </div>
+      
+      <div>
+        <p class="text-xs text-stone-500 mb-2 font-medium">${item.title}</p>
+        <textarea id="modal-note-text" rows="4" class="w-full bg-rose-50/40 border border-red-300 rounded-2xl p-3 text-sm text-stone-800 focus:outline-none focus:border-rose-600 focus:ring-1 focus:ring-rose-600 font-sans" placeholder="Введите текст заметки...">${item.note ?? ''}</textarea>
+      </div>
+
+      <div class="flex items-center justify-end space-x-3 pt-2">
+        <button onclick="document.getElementById('note-modal-overlay').remove()" class="bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-semibold px-4 py-2.5 rounded-xl transition-colors">Отмена</button>
+        <button onclick="saveNoteFromModal(${item.id})" class="bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold px-5 py-2.5 rounded-xl transition-colors shadow-sm shadow-rose-600/30">Сохранить заметку</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+  const textarea = document.getElementById('modal-note-text') as HTMLTextAreaElement;
+  if (textarea) textarea.focus();
+};
+
+(window as any).saveNoteFromModal = async function(itemId: number) {
+  const textarea = document.getElementById('modal-note-text') as HTMLTextAreaElement;
+  if (!textarea) return;
+
+  const val = textarea.value.trim();
+  const targetItem: any = items.find(i => i.id === itemId);
+  if (targetItem) {
+    targetItem.note = val;
+  }
+
+  try {
+    await supabaseClient.from(TABLE_NAME).update({ note: val }).eq('id', itemId);
+    await updateLastModifiedTime();
+    document.getElementById('note-modal-overlay')?.remove();
+    renderDashboard();
+  } catch (err) {
+    console.error('Error updating note in Supabase:', err);
+    alert('Не удалось сохранить заметку.');
+  }
 };
 
 function renderDashboard(): void {
@@ -373,7 +434,7 @@ function renderDashboard(): void {
       } else {
         cInput.value = '';
         tInput.value = '';
-        await updateLastModifiedTime(); // Обновляем время при добавлении задачи
+        await updateLastModifiedTime();
         await fetchItemsFromSupabase();
       }
     });
@@ -455,7 +516,7 @@ function renderDashboard(): void {
         const currentQty = item.quantity ?? 1;
         const currentMultiplier = item.multiplier ?? 100;
         const rowTotal = currentQty * currentMultiplier;
-        const currentNote = item.note ?? '';
+        const hasNote = Boolean(item.note && item.note.trim().length > 0);
 
         const catalogEntry = catalogDatabase.find(c => c.code === item.code);
 
@@ -476,10 +537,13 @@ function renderDashboard(): void {
           `;
         }
 
-        const noteColumnHtml = section.key === 'process' 
-          ? `<div class="w-full xl:w-40 shrink-0">
-               <input type="text" value="${currentNote}" data-id="${item.id}" data-field="note" placeholder="Note..." class="item-note-input w-full bg-stone-50 border border-stone-300 rounded-xl px-2.5 py-1.5 text-xs text-stone-800 focus:outline-none focus:border-blue-500 font-sans" />
-             </div>`
+        // Кнопка комментариев вместо постоянного поля ввода заметки (подсвечивается красным, если заметка есть)
+        const noteBtnClass = hasNote 
+          ? 'bg-rose-600 text-white border-rose-600 hover:bg-rose-700 shadow-sm' 
+          : 'bg-stone-50 text-stone-400 hover:text-rose-600 border-stone-200 hover:bg-rose-50';
+
+        const noteButtonHtml = section.key === 'process' 
+          ? `<button onclick="openNoteModal(${item.id})" class="p-2 rounded-xl border text-xs transition-colors shrink-0 ${noteBtnClass}" title="${hasNote ? 'Изменить заметку: ' + item.note : 'Добавить заметку'}">💬</button>`
           : '';
 
         tableContent += `
@@ -504,7 +568,7 @@ function renderDashboard(): void {
             </div>
 
             <div class="flex flex-wrap items-center justify-between xl:justify-end gap-3 w-full xl:w-auto pt-3 xl:pt-0 border-t xl:border-t-0 border-stone-100 shrink-0">
-              ${noteColumnHtml}
+              ${noteButtonHtml}
 
               <div class="flex items-center space-x-1.5 bg-stone-50 px-3 py-1.5 rounded-xl border border-stone-200">
                 <input type="number" min="1" value="${currentQty}" data-id="${item.id}" data-field="quantity" class="item-calc-input w-12 text-center bg-white border border-stone-300 rounded-lg text-xs py-1 focus:outline-none focus:border-blue-500 font-mono font-bold" />
@@ -546,32 +610,12 @@ function renderDashboard(): void {
         const updateObj: any = {};
         updateObj[field!] = val;
         await supabaseClient.from(TABLE_NAME).update(updateObj).eq('id', id);
-        await updateLastModifiedTime(); // Обновляем время при изменении чисел в калькуляторе
+        await updateLastModifiedTime();
       } catch (err) {
         console.error('Error updating in Supabase:', err);
       }
 
       renderDashboard();
-    });
-  });
-
-  document.querySelectorAll('.item-note-input').forEach(input => {
-    input.addEventListener('change', async (e) => {
-      const target = e.target as HTMLInputElement;
-      const id = Number(target.getAttribute('data-id'));
-      const val = target.value;
-
-      const targetItem: any = items.find(i => i.id === id);
-      if (targetItem) {
-        targetItem.note = val;
-      }
-
-      try {
-        await supabaseClient.from(TABLE_NAME).update({ note: val }).eq('id', id);
-        await updateLastModifiedTime(); // Обновляем время при изменении заметки
-      } catch (err) {
-        console.error('Error updating note in Supabase:', err);
-      }
     });
   });
 
@@ -597,7 +641,7 @@ function renderDashboard(): void {
           alert('Не удалось удалить: ' + error.message);
         } else {
           item.status = 'deleted';
-          await updateLastModifiedTime(); // Обновляем время при удалении
+          await updateLastModifiedTime();
           renderDashboard();
         }
       } catch (err) {
@@ -663,14 +707,13 @@ async function saveOrderAndRefresh() {
         .update({ sort_order: item.sort_order })
         .eq('id', item.id);
     }
-    await updateLastModifiedTime(); // Обновляем время при перетаскивании/сортировке строк
+    await updateLastModifiedTime();
   } catch (err) {
     console.warn('Ошибка сохранения порядка в базу:', err);
   }
   renderDashboard();
 }
 
-// Теперь кнопка Refresh просто заново скачивает актуальные данные из базы, не меняя метку времени
 async function handleRefreshClick(): Promise<void> {
   if (refreshButton) {
     refreshButton.disabled = true;
