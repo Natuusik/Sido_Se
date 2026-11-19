@@ -289,12 +289,6 @@ function renderDashboard() {
             title: '🛠️ In Progress',
             bgClass: 'bg-blue-50 border-blue-300 shadow-xl shadow-stone-200/50',
             badgeClass: 'bg-blue-100 text-blue-800 border border-blue-300'
-        },
-        {
-            key: 'boxes',
-            title: '📦 Boxes & Packaging',
-            bgClass: 'bg-amber-50 border-amber-300 shadow-xl shadow-stone-200/50',
-            badgeClass: 'bg-amber-100 text-amber-800 border border-amber-300'
         }
     ];
     targetSections.forEach(section => {

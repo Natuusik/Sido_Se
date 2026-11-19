@@ -343,7 +343,6 @@ const targetSections = [
       badgeClass: 'bg-blue-100 text-blue-800 border border-blue-300' 
     }
   ];
-
   targetSections.forEach(section => {
     const groupItems = items
       .filter(item => item.status === section.key)
