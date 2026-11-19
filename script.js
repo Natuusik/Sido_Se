@@ -49,6 +49,7 @@ const catalogDatabase = [
     { code: "722002", title: "FM 333x230 White", pdfUrl: "./docs/722002.pdf" },
     { code: "722004", title: "FM 333x318 White", pdfUrl: "./docs/722004.pdf" },
     { code: "722006", title: "FM 333x318 White / 850mic", pdfUrl: "./docs/722006.pdf" },
+    { code: "721005", title: "FM 333x350 White / 850mic", pdfUrl: "./docs/721005.pdf" },
     { code: "722007", title: "FM 333x230 White", pdfUrl: "./docs/722007.pdf" },
     { code: "722016", title: "FM 440x318 White", pdfUrl: "./docs/722016.pdf" },
     { code: "707072", title: "Replaceable drain pan for ONE series (10 pcs)", pdfUrl: "./docs/707072.pdf" },
@@ -97,6 +98,26 @@ function renderLastUpdateTime() {
     const minutes = pad(d.getMinutes());
     const seconds = pad(d.getSeconds());
     timeContainer.innerText = `Updated: ${day}.${month}.${year} ${hours}:${minutes}:${seconds}`;
+}
+// Вспомогательная функция для записи нового времени изменения в базу Supabase
+async function updateLastModifiedTime() {
+    const now = new Date();
+    try {
+        const { error } = await supabaseClient
+            .from('app_settings')
+            .update({ last_update_time: now.toISOString() })
+            .eq('id', 1);
+        if (error) {
+            console.error('Ошибка сохранения времени в базу:', error);
+        }
+        else {
+            lastUpdateTime = now;
+            renderLastUpdateTime();
+        }
+    }
+    catch (err) {
+        console.error('Ошибка при обновлении времени:', err);
+    }
 }
 function formatTitle(title) {
     return title.replace(/black/gi, function (match) {
@@ -154,6 +175,7 @@ window.markAsReady = async function (itemId) {
             alert('Не удалось обновить статус: ' + error.message);
         }
         else {
+            await updateLastModifiedTime(); // Обновляем время при переносе в готовые
             await fetchItemsFromSupabase();
         }
     }
@@ -161,12 +183,11 @@ window.markAsReady = async function (itemId) {
         console.error('Ошибка в markAsReady:', err);
     }
 };
-// Функция отмены удаления (возврат последнего удаленного элемента)
+// Функция отмены удаления (Undo)
 window.undoLastDelete = async function () {
     const deletedItems = items.filter(i => i.status === 'deleted');
     if (deletedItems.length === 0)
         return;
-    // Берем последний удаленный (по ID или времени)
     const lastDeleted = deletedItems[deletedItems.length - 1];
     try {
         const { error } = await supabaseClient
@@ -178,6 +199,7 @@ window.undoLastDelete = async function () {
             alert('Не удалось восстановить позицию: ' + error.message);
         }
         else {
+            await updateLastModifiedTime(); // Обновляем время при возврате
             await fetchItemsFromSupabase();
         }
     }
@@ -207,10 +229,13 @@ window.editItemModal = function (itemId) {
     supabaseClient.from(TABLE_NAME)
         .update({ code: trimmedCode, title: trimmedTitle, pdfUrl: item.pdfUrl })
         .eq('id', itemId)
-        .then(({ error }) => {
+        .then(async ({ error }) => {
         if (error) {
             console.error("Ошибка обновления:", error);
             alert("Не удалось сохранить изменения в базе.");
+        }
+        else {
+            await updateLastModifiedTime(); // Обновляем время при редактировании
         }
         renderDashboard();
     });
@@ -297,11 +322,11 @@ function renderDashboard() {
             else {
                 cInput.value = '';
                 tInput.value = '';
+                await updateLastModifiedTime(); // Обновляем время при добавлении задачи
                 await fetchItemsFromSupabase();
             }
         });
     }
-    // Оставляем только нужные рабочие секции (без блока boxes и без отдельного блока deleted)
     const targetSections = [
         {
             key: 'ready',
@@ -316,7 +341,6 @@ function renderDashboard() {
             badgeClass: 'bg-blue-100 text-blue-800 border border-blue-300'
         }
     ];
-    // Проверяем, есть ли что возвращать в корзине
     const hasDeletedItems = items.filter(i => i.status === 'deleted').length > 0;
     targetSections.forEach(section => {
         const groupItems = items
@@ -326,7 +350,6 @@ function renderDashboard() {
         const sectionDiv = document.createElement('div');
         sectionDiv.id = `${section.key}-section`;
         sectionDiv.className = `rounded-3xl p-4 md:p-8 border mb-8 ${section.bgClass}`;
-        // Кнопка возврата (Undo) появляется рядом с принтом и вордом, если есть удаленные элементы
         const undoButtonHtml = hasDeletedItems
             ? `<button onclick="undoLastDelete()" class="bg-amber-600 hover:bg-amber-700 text-white text-xs px-3.5 py-2 rounded-xl font-medium transition-colors shadow-sm flex items-center space-x-1" title="Вернуть последнее удаление"><span>↩️ Undo</span></button>`
             : '';
@@ -454,6 +477,7 @@ function renderDashboard() {
                 const updateObj = {};
                 updateObj[field] = val;
                 await supabaseClient.from(TABLE_NAME).update(updateObj).eq('id', id);
+                await updateLastModifiedTime(); // Обновляем время при изменении чисел в калькуляторе
             }
             catch (err) {
                 console.error('Error updating in Supabase:', err);
@@ -472,6 +496,7 @@ function renderDashboard() {
             }
             try {
                 await supabaseClient.from(TABLE_NAME).update({ note: val }).eq('id', id);
+                await updateLastModifiedTime(); // Обновляем время при изменении заметки
             }
             catch (err) {
                 console.error('Error updating note in Supabase:', err);
@@ -500,6 +525,7 @@ function renderDashboard() {
                 }
                 else {
                     item.status = 'deleted';
+                    await updateLastModifiedTime(); // Обновляем время при удалении
                     renderDashboard();
                 }
             }
@@ -555,30 +581,20 @@ async function saveOrderAndRefresh() {
                 .update({ sort_order: item.sort_order })
                 .eq('id', item.id);
         }
+        await updateLastModifiedTime(); // Обновляем время при перетаскивании/сортировке строк
     }
     catch (err) {
         console.warn('Ошибка сохранения порядка в базу:', err);
     }
     renderDashboard();
 }
+// Теперь кнопка Refresh просто заново скачивает актуальные данные из базы, не меняя метку времени
 async function handleRefreshClick() {
     if (refreshButton) {
         refreshButton.disabled = true;
         refreshButton.style.opacity = '0.6';
     }
-    const now = new Date();
     try {
-        const { error } = await supabaseClient
-            .from('app_settings')
-            .update({ last_update_time: now.toISOString() })
-            .eq('id', 1);
-        if (error) {
-            console.error('Ошибка сохранения времени в базу:', error);
-        }
-        else {
-            lastUpdateTime = now;
-            renderLastUpdateTime();
-        }
         const { data: taskData, error: taskError } = await supabaseClient.from(TABLE_NAME).select('*');
         if (taskError) {
             console.error('Ошибка загрузки задач:', taskError.message);
@@ -597,6 +613,9 @@ async function handleRefreshClick() {
             refreshButton.style.opacity = '1';
         }
     }
+}
+if (refreshButton) {
+    refreshButton.addEventListener('click', handleRefreshClick);
 }
 renderHeaderDate();
 fetchItemsFromSupabase();

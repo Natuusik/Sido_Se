@@ -79,6 +79,7 @@ const catalogDatabase: CatalogItem[] = [
   { code: "722002", title: "FM 333x230 White", pdfUrl: "./docs/722002.pdf" },
   { code: "722004", title: "FM 333x318 White", pdfUrl: "./docs/722004.pdf" },
   { code: "722006", title: "FM 333x318 White / 850mic", pdfUrl: "./docs/722006.pdf" },
+  { code: "721005", title: "FM 333x350 White / 850mic", pdfUrl: "./docs/721005.pdf" },
   { code: "722007", title: "FM 333x230 White", pdfUrl: "./docs/722007.pdf" },
   { code: "722016", title: "FM 440x318 White", pdfUrl: "./docs/722016.pdf" },
 
@@ -135,6 +136,26 @@ function renderLastUpdateTime(): void {
   const seconds = pad(d.getSeconds());
 
   timeContainer.innerText = `Updated: ${day}.${month}.${year} ${hours}:${minutes}:${seconds}`;
+}
+
+// Вспомогательная функция для записи нового времени изменения в базу Supabase
+async function updateLastModifiedTime(): Promise<void> {
+  const now = new Date();
+  try {
+    const { error } = await supabaseClient
+      .from('app_settings')
+      .update({ last_update_time: now.toISOString() })
+      .eq('id', 1);
+
+    if (error) {
+      console.error('Ошибка сохранения времени в базу:', error);
+    } else {
+      lastUpdateTime = now;
+      renderLastUpdateTime();
+    }
+  } catch (err) {
+    console.error('Ошибка при обновлении времени:', err);
+  }
 }
 
 function formatTitle(title: string): string {
@@ -195,6 +216,7 @@ async function fetchItemsFromSupabase(): Promise<void> {
       console.error('Ошибка Supabase:', error);
       alert('Не удалось обновить статус: ' + error.message);
     } else {
+      await updateLastModifiedTime(); // Обновляем время при переносе в готовые
       await fetchItemsFromSupabase();
     }
   } catch (err) {
@@ -202,12 +224,11 @@ async function fetchItemsFromSupabase(): Promise<void> {
   }
 };
 
-// Функция отмены удаления (возврат последнего удаленного элемента)
+// Функция отмены удаления (Undo)
 (window as any).undoLastDelete = async function() {
   const deletedItems = items.filter(i => i.status === 'deleted');
   if (deletedItems.length === 0) return;
 
-  // Берем последний удаленный (по ID или времени)
   const lastDeleted = deletedItems[deletedItems.length - 1];
 
   try {
@@ -220,6 +241,7 @@ async function fetchItemsFromSupabase(): Promise<void> {
       console.error('Ошибка отмены удаления:', error);
       alert('Не удалось восстановить позицию: ' + error.message);
     } else {
+      await updateLastModifiedTime(); // Обновляем время при возврате
       await fetchItemsFromSupabase();
     }
   } catch (err) {
@@ -252,10 +274,12 @@ async function fetchItemsFromSupabase(): Promise<void> {
   supabaseClient.from(TABLE_NAME)
     .update({ code: trimmedCode, title: trimmedTitle, pdfUrl: item.pdfUrl })
     .eq('id', itemId)
-    .then(({ error }: { error: any }) => {
+    .then(async ({ error }: { error: any }) => {
       if (error) {
         console.error("Ошибка обновления:", error);
         alert("Не удалось сохранить изменения в базе.");
+      } else {
+        await updateLastModifiedTime(); // Обновляем время при редактировании
       }
       renderDashboard();
     });
@@ -349,12 +373,12 @@ function renderDashboard(): void {
       } else {
         cInput.value = '';
         tInput.value = '';
+        await updateLastModifiedTime(); // Обновляем время при добавлении задачи
         await fetchItemsFromSupabase();
       }
     });
   }
 
-  // Оставляем только нужные рабочие секции (без блока boxes и без отдельного блока deleted)
   const targetSections = [
     { 
       key: 'ready', 
@@ -370,7 +394,6 @@ function renderDashboard(): void {
     }
   ];
 
-  // Проверяем, есть ли что возвращать в корзине
   const hasDeletedItems = items.filter(i => i.status === 'deleted').length > 0;
 
   targetSections.forEach(section => {
@@ -383,7 +406,6 @@ function renderDashboard(): void {
     sectionDiv.id = `${section.key}-section`;
     sectionDiv.className = `rounded-3xl p-4 md:p-8 border mb-8 ${section.bgClass}`;
 
-    // Кнопка возврата (Undo) появляется рядом с принтом и вордом, если есть удаленные элементы
     const undoButtonHtml = hasDeletedItems 
       ? `<button onclick="undoLastDelete()" class="bg-amber-600 hover:bg-amber-700 text-white text-xs px-3.5 py-2 rounded-xl font-medium transition-colors shadow-sm flex items-center space-x-1" title="Вернуть последнее удаление"><span>↩️ Undo</span></button>`
       : '';
@@ -524,6 +546,7 @@ function renderDashboard(): void {
         const updateObj: any = {};
         updateObj[field!] = val;
         await supabaseClient.from(TABLE_NAME).update(updateObj).eq('id', id);
+        await updateLastModifiedTime(); // Обновляем время при изменении чисел в калькуляторе
       } catch (err) {
         console.error('Error updating in Supabase:', err);
       }
@@ -545,6 +568,7 @@ function renderDashboard(): void {
 
       try {
         await supabaseClient.from(TABLE_NAME).update({ note: val }).eq('id', id);
+        await updateLastModifiedTime(); // Обновляем время при изменении заметки
       } catch (err) {
         console.error('Error updating note in Supabase:', err);
       }
@@ -573,6 +597,7 @@ function renderDashboard(): void {
           alert('Не удалось удалить: ' + error.message);
         } else {
           item.status = 'deleted';
+          await updateLastModifiedTime(); // Обновляем время при удалении
           renderDashboard();
         }
       } catch (err) {
@@ -638,33 +663,21 @@ async function saveOrderAndRefresh() {
         .update({ sort_order: item.sort_order })
         .eq('id', item.id);
     }
+    await updateLastModifiedTime(); // Обновляем время при перетаскивании/сортировке строк
   } catch (err) {
     console.warn('Ошибка сохранения порядка в базу:', err);
   }
   renderDashboard();
 }
 
+// Теперь кнопка Refresh просто заново скачивает актуальные данные из базы, не меняя метку времени
 async function handleRefreshClick(): Promise<void> {
   if (refreshButton) {
     refreshButton.disabled = true;
     refreshButton.style.opacity = '0.6';
   }
 
-  const now = new Date();
-
   try {
-    const { error } = await supabaseClient
-      .from('app_settings')
-      .update({ last_update_time: now.toISOString() })
-      .eq('id', 1);
-
-    if (error) {
-      console.error('Ошибка сохранения времени в базу:', error);
-    } else {
-      lastUpdateTime = now;
-      renderLastUpdateTime();
-    }
-
     const { data: taskData, error: taskError } = await supabaseClient.from(TABLE_NAME).select('*');
     if (taskError) {
       console.error('Ошибка загрузки задач:', taskError.message);
@@ -672,7 +685,6 @@ async function handleRefreshClick(): Promise<void> {
       items = taskData;
       renderDashboard();
     }
-
   } catch (err) {
     console.error('Ошибка рефреша:', err);
   } finally {
@@ -682,5 +694,10 @@ async function handleRefreshClick(): Promise<void> {
     }
   }
 }
+
+if (refreshButton) {
+  refreshButton.addEventListener('click', handleRefreshClick);
+}
+
 renderHeaderDate();
 fetchItemsFromSupabase();
