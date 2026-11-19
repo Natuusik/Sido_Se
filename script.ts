@@ -23,7 +23,7 @@ interface CatalogItem {
 
 interface ProductionItem extends CatalogItem {
   id: number;
-  status: 'ready' | 'process' | 'boxes';
+  status: 'ready' | 'process' | 'deleted';
   quantity?: number;
   multiplier?: number;
   note?: string;
@@ -202,6 +202,24 @@ async function fetchItemsFromSupabase(): Promise<void> {
   }
 };
 
+(window as any).restoreItem = async function(itemId: number) {
+  try {
+    const { error } = await supabaseClient
+      .from(TABLE_NAME)
+      .update({ status: 'process' })
+      .eq('id', itemId);
+
+    if (error) {
+      console.error('Ошибка восстановления:', error);
+      alert('Не удалось восстановить: ' + error.message);
+    } else {
+      await fetchItemsFromSupabase();
+    }
+  } catch (err) {
+    console.error('Ошибка в restoreItem:', err);
+  }
+};
+
 (window as any).editItemModal = function(itemId: number) {
   const item = items.find(i => i.id === itemId);
   if (!item) return;
@@ -329,7 +347,7 @@ function renderDashboard(): void {
     });
   }
 
-const targetSections = [
+  const targetSections = [
     { 
       key: 'ready', 
       title: '✅ Completed Goods', 
@@ -341,8 +359,15 @@ const targetSections = [
       title: '🛠️ In Progress', 
       bgClass: 'bg-blue-50 border-blue-300 shadow-xl shadow-stone-200/50', 
       badgeClass: 'bg-blue-100 text-blue-800 border border-blue-300' 
+    },
+    { 
+      key: 'deleted', 
+      title: '🗑️ Trash (Корзина)', 
+      bgClass: 'bg-stone-200/60 border-stone-300 shadow-sm', 
+      badgeClass: 'bg-stone-300 text-stone-700 border border-stone-400' 
     }
   ];
+
   targetSections.forEach(section => {
     const groupItems = items
       .filter(item => item.status === section.key)
@@ -353,7 +378,7 @@ const targetSections = [
     sectionDiv.id = `${section.key}-section`;
     sectionDiv.className = `rounded-3xl p-4 md:p-8 border mb-8 ${section.bgClass}`;
 
-    const actionButtonsHtml = count > 0
+    const actionButtonsHtml = (count > 0 && section.key !== 'deleted')
       ? `<div class="flex flex-wrap items-center gap-2 no-print">
           <button id="print-${section.key}-table" class="bg-stone-800 hover:bg-stone-900 text-white text-xs px-3.5 py-2 rounded-xl font-medium transition-colors shadow-sm flex items-center space-x-1"><span>🖨️ Print / PDF</span></button>
           <button id="copy-${section.key}-table" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3.5 py-2 rounded-xl font-medium transition-colors shadow-sm flex items-center space-x-1"><span>📋 To Word</span></button>
@@ -379,6 +404,8 @@ const targetSections = [
         let actionButton = '';
         if (section.key === 'process') {
           actionButton = `<button onclick="markAsReady(${item.id})" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-xl text-xs font-semibold transition-colors shadow-sm shrink-0">✅ Done</button>`;
+        } else if (section.key === 'deleted') {
+          actionButton = `<button onclick="restoreItem(${item.id})" class="bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-2 rounded-xl text-xs font-semibold transition-colors shadow-sm shrink-0 flex items-center space-x-1"><span>↩️ Restore</span></button>`;
         }
 
         const text = `${item.title} ${item.code}`.toUpperCase();
@@ -424,6 +451,14 @@ const targetSections = [
              </div>`
           : '';
 
+        let deleteButtonHtml = '';
+        if (section.key !== 'deleted') {
+          deleteButtonHtml = `
+            <button onclick="editItemModal(${item.id})" class="bg-stone-50 hover:bg-amber-50 text-stone-400 hover:text-amber-600 border border-stone-200 p-2 rounded-xl text-xs transition-colors shadow-xs" title="Edit item">✏️</button>
+            <button class="delete-btn bg-stone-50 hover:bg-rose-50 text-stone-400 hover:text-rose-600 border border-stone-200 p-2 rounded-xl text-xs transition-colors shadow-xs" data-id="${item.id}" title="Delete item">🗑️</button>
+          `;
+        }
+
         tableContent += `
           <div data-id="${item.id}" class="draggable-row flex flex-col xl:flex-row items-start xl:items-center justify-between p-4 bg-white rounded-2xl border border-stone-200/80 border-l-4 ${borderAccentClass} shadow-sm transition-all hover:shadow-md gap-4">
             <div class="flex items-center space-x-3 w-full xl:w-auto overflow-hidden">
@@ -457,8 +492,7 @@ const targetSections = [
 
               <div class="flex items-center space-x-2 no-print">
                 ${actionButton}
-                <button onclick="editItemModal(${item.id})" class="bg-stone-50 hover:bg-amber-50 text-stone-400 hover:text-amber-600 border border-stone-200 p-2 rounded-xl text-xs transition-colors shadow-xs" title="Edit item">✏️</button>
-                <button class="delete-btn bg-stone-50 hover:bg-rose-50 text-stone-400 hover:text-rose-600 border border-stone-200 p-2 rounded-xl text-xs transition-colors shadow-xs" data-id="${item.id}" title="Delete item">🗑️</button>
+                ${deleteButtonHtml}
               </div>
             </div>
           </div>
@@ -521,19 +555,22 @@ const targetSections = [
       const id = Number(target.getAttribute('data-id'));
       if (!id) return;
 
-      if (!confirm('Удалить эту позицию?')) return;
+      const item = items.find(i => i.id === id);
+      if (!item) return;
+
+      if (!confirm(`Отправить в корзину позицию "${item.title}"?`)) return;
 
       try {
         const { error } = await supabaseClient
           .from(TABLE_NAME)
-          .delete()
+          .update({ status: 'deleted' })
           .eq('id', id);
 
         if (error) {
-          console.error('Ошибка удаления из Supabase:', error);
-          alert('Не удалось удалить строку: ' + error.message);
+          console.error('Ошибка перемещения в корзину:', error);
+          alert('Не удалось переместить в корзину: ' + error.message);
         } else {
-          items = items.filter(i => i.id !== id);
+          item.status = 'deleted';
           renderDashboard();
         }
       } catch (err) {
