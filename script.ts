@@ -60,12 +60,12 @@ const catalogDatabase: CatalogItem[] = [
   { code: "732054", title: "BXT End sheet white 254 x 254 mm Square Black", pdfUrl: "./docs/732054.pdf" },
 
  { code: "714037", title: "Lazer Printable 329x500 50 pcs", pdfUrl: "./docs/714037.pdf", defaultMultiplier: 50 },
-  { code: "714039", title: "Lazer Printable 329x500 500 pcs", pdfUrl: "./docs/714039.pdf", pdfUrl2: "./docs/Laser_329x500_RedLebel.pdf" },
-  { code: "714040", title: "Lazer Printable 329x660 250 pcs", pdfUrl: "./docs/714040.pdf" },
-  { code: "714106", title: "Lazer Printable Lamifree 329x660 250 pcs", pdfUrl: "./docs/714106.pdf" },
-  { code: "714041", title: "Inkjet Printable 329x530 50 pcs", pdfUrl: "./docs/714041.pdf" },
-  { code: "714043", title: "Inkjet Printable 329x530 500 pcs", pdfUrl: "./docs/714043.pdf" },
-  { code: "714044", title: "Inkjet Printable 329x660 250 pcs", pdfUrl: "./docs/714044.pdf" },
+  { code: "714039", title: "Lazer Printable 329x500 500 pcs", pdfUrl: "./docs/714039.pdf", pdfUrl2: "./docs/Laser_329x500_RedLebel.pdf", defaultMultiplier: 500 },
+  { code: "714040", title: "Lazer Printable 329x660 250 pcs", pdfUrl: "./docs/714040.pdf", defaultMultiplier: 250 },
+  { code: "714106", title: "Lazer Printable Lamifree 329x660 250 pcs", pdfUrl: "./docs/714106.pdf", defaultMultiplier: 250 },
+  { code: "714041", title: "Inkjet Printable 329x530 50 pcs", pdfUrl: "./docs/714041.pdf", defaultMultiplier: 50 },
+  { code: "714043", title: "Inkjet Printable 329x530 500 pcs", pdfUrl: "./docs/714043.pdf", defaultMultiplier: 500 },
+  { code: "714044", title: "Inkjet Printable 329x660 250 pcs", pdfUrl: "./docs/714044.pdf", defaultMultiplier: 250 },
 
   { code: "714047", title: "Grey Board A4 Portrait 207x302 / 2 mm", pdfUrl: "./docs/714047.pdf" },
   { code: "714048", title: "Grey Board A4 Landscape 294x220 / 2 mm", pdfUrl: "./docs/714048.pdf" },
@@ -79,8 +79,8 @@ const catalogDatabase: CatalogItem[] = [
   { code: "721011", title: "FM 333x350 White", pdfUrl: "./docs/721011.pdf" },
   { code: "722002", title: "FM 333x230 White", pdfUrl: "./docs/722002.pdf" },
   { code: "722004", title: "FM 333x318 White", pdfUrl: "./docs/722004.pdf" },
-  { code: "722006", title: "FM 333x318 White / 850mic", pdfUrl: "./docs/722006.pdf" },
-  { code: "721005", title: "FM 333x350 White / 850mic", pdfUrl: "./docs/721005.pdf" },
+  { code: "722006", title: "FM 333x318 White / 850mic", pdfUrl: "./docs/722006.pdf", defaultMultiplier: 50 },
+  { code: "721005", title: "FM 333x350 White / 850mic", pdfUrl: "./docs/721005.pdf" , defaultMultiplier: 50},
   { code: "722007", title: "FM 333x230 White", pdfUrl: "./docs/722007.pdf" },
   { code: "722016", title: "FM 440x318 White", pdfUrl: "./docs/722016.pdf" },
 
@@ -608,6 +608,9 @@ function renderDashboard(): void {
       if (!code || !title) return;
       const catalogMatch = catalogDatabase.find(i => i.code === code);
       const resolvedPdfUrl = catalogMatch ? catalogMatch.pdfUrl : `./docs/${code}.pdf`;
+      
+      // Автоматически берем дефолтный множитель из каталога, если он задан, иначе ставим 100
+      const autoMultiplier = catalogMatch?.defaultMultiplier ?? 100;
 
       const processItems = items.filter(i => i.status === 'process');
       const maxSortOrder = processItems.length > 0
@@ -622,11 +625,10 @@ function renderDashboard(): void {
         status: 'process' as const,
         pdfUrl: resolvedPdfUrl,
         quantity: 1,
-        multiplier: 100,
+        multiplier: autoMultiplier, // <--- Здесь теперь автоматический множитель!
         note: '',
         sort_order: newSortOrder
       };
-
       const { error } = await supabaseClient.from(TABLE_NAME).insert([newItem]);
       if (error) {
         console.error('Error inserting item:', error.message);
