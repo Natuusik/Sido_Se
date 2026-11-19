@@ -20,8 +20,8 @@ interface CatalogItem {
   title: string;
   pdfUrl: string;
   pdfUrl2?: string;
+  defaultMultiplier?: number; // Новое поле для стандартного множителя
 }
-
 interface ProductionItem extends CatalogItem {
   id: number;
   status: 'ready' | 'process' | 'deleted';
@@ -59,7 +59,7 @@ const catalogDatabase: CatalogItem[] = [
   { code: "732053", title: "BXT End sheet white 254 x 254 mm Square White", pdfUrl: "./docs/732053.pdf" },
   { code: "732054", title: "BXT End sheet white 254 x 254 mm Square Black", pdfUrl: "./docs/732054.pdf" },
 
-  { code: "714037", title: "Lazer Printable 329x500 50 pcs", pdfUrl: "./docs/714037.pdf" },
+ { code: "714037", title: "Lazer Printable 329x500 50 pcs", pdfUrl: "./docs/714037.pdf", defaultMultiplier: 50 },
   { code: "714039", title: "Lazer Printable 329x500 500 pcs", pdfUrl: "./docs/714039.pdf", pdfUrl2: "./docs/Laser_329x500_RedLebel.pdf" },
   { code: "714040", title: "Lazer Printable 329x660 250 pcs", pdfUrl: "./docs/714040.pdf" },
   { code: "714106", title: "Lazer Printable Lamifree 329x660 250 pcs", pdfUrl: "./docs/714106.pdf" },
