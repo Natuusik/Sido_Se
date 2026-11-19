@@ -132,9 +132,7 @@
         headerTitle = 'Completed Goods';
       } else if (sectionId.includes('process')) {
         headerTitle = 'In Progress';
-      } else if (sectionId.includes('boxes')) {
-        headerTitle = 'Boxes & Packaging';
-      }
+      } 
 
       const rows = Array.from(section.querySelectorAll('.draggable-row'));
       if (rows.length === 0) {
