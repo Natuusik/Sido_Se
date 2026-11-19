@@ -1,5 +1,3 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
 const SUPABASE_URL = 'https://vuppdvlpsbyzhcmalhoi.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_frIjzGAOaW77jegazxN-_Q_OUqN-hzO';
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -67,9 +65,6 @@ const catalogDatabase = [
 let items = [];
 let lastUpdateTime = null;
 const dashboardContainer = document.getElementById('dashboard-container');
-// ==========================================
-// 2. Вспомогательные функции рендеринга
-// ==========================================
 function renderHeaderDate() {
     const dateContainer = document.getElementById('current-date');
     if (!dateContainer)
@@ -108,9 +103,6 @@ function formatTitle(title) {
         return `<span style="font-style: italic; text-decoration: underline;">${match}</span>`;
     });
 }
-// ==========================================
-// 3. Работа с Supabase (Загрузка задач + Время)
-// ==========================================
 async function fetchItemsFromSupabase() {
     try {
         const { data: taskData, error: taskError } = await supabaseClient.from(TABLE_NAME).select('*');
@@ -140,20 +132,16 @@ async function fetchItemsFromSupabase() {
         renderLastUpdateTime();
     }
 }
-// Глобальная функция для кнопки "Done"
 window.markAsReady = async function (itemId) {
     try {
-        // 1. Находим элемент в локальном массиве
         const item = items.find(i => i.id === itemId);
         if (!item)
             return;
-        // 2. Вычисляем следующий sort_order для секции 'ready' (чтобы встал в самый конец готовых)
         const readyItems = items.filter(i => i.status === 'ready');
         const maxSortOrder = readyItems.length > 0
             ? Math.max(...readyItems.map(i => i.sort_order ?? 0))
             : -1;
         const newSortOrder = maxSortOrder + 1;
-        // 3. Обновляем статус и новый порядок в Supabase
         const { error } = await supabaseClient
             .from(TABLE_NAME)
             .update({
@@ -166,7 +154,6 @@ window.markAsReady = async function (itemId) {
             alert('Не удалось обновить статус: ' + error.message);
         }
         else {
-            // 4. Перезагружаем актуальные данные с сервера и перерисовываем дашборд
             await fetchItemsFromSupabase();
         }
     }
@@ -174,14 +161,13 @@ window.markAsReady = async function (itemId) {
         console.error('Ошибка в markAsReady:', err);
     }
 };
-// Функция редактирования карточки (Карандашик)
 window.editItemModal = function (itemId) {
     const item = items.find(i => i.id === itemId);
     if (!item)
         return;
     const newCode = prompt("Редактировать код товара:", item.code);
     if (newCode === null)
-        return; // Нажали отмену
+        return;
     const newTitle = prompt("Редактировать название товара:", item.title);
     if (newTitle === null)
         return;
@@ -191,7 +177,6 @@ window.editItemModal = function (itemId) {
         alert("Код и название не могут быть пустыми!");
         return;
     }
-    // Обновляем локально и в базе
     item.code = trimmedCode;
     item.title = trimmedTitle;
     item.pdfUrl = `./docs/${trimmedCode}.pdf`;
@@ -206,14 +191,10 @@ window.editItemModal = function (itemId) {
         renderDashboard();
     });
 };
-// ==========================================
-// 4. Отрисовка дашборда и кнопок управления
-// ==========================================
 function renderDashboard() {
     if (!dashboardContainer)
         return;
     dashboardContainer.innerHTML = '';
-    // Форма добавления задачи
     const addFormContainer = document.createElement('div');
     addFormContainer.id = 'add-item-form-container';
     addFormContainer.className = 'bg-white rounded-2xl p-6 mb-8 border border-stone-200 shadow-md';
@@ -268,7 +249,6 @@ function renderDashboard() {
                 return;
             const catalogMatch = catalogDatabase.find(i => i.code === code);
             const resolvedPdfUrl = catalogMatch ? catalogMatch.pdfUrl : `./docs/${code}.pdf`;
-            // Вычисляем следующий порядковый номер для секции 'process'
             const processItems = items.filter(i => i.status === 'process');
             const maxSortOrder = processItems.length > 0
                 ? Math.max(...processItems.map(i => i.sort_order ?? 0))
@@ -283,7 +263,7 @@ function renderDashboard() {
                 quantity: 1,
                 multiplier: 100,
                 note: '',
-                sort_order: newSortOrder // <-- Добавляем порядковый номер в конец списка
+                sort_order: newSortOrder
             };
             const { error } = await supabaseClient.from(TABLE_NAME).insert([newItem]);
             if (error) {
@@ -309,6 +289,12 @@ function renderDashboard() {
             title: '🛠️ In Progress',
             bgClass: 'bg-blue-50 border-blue-300 shadow-xl shadow-stone-200/50',
             badgeClass: 'bg-blue-100 text-blue-800 border border-blue-300'
+        },
+        {
+            key: 'boxes',
+            title: '📦 Boxes & Packaging',
+            bgClass: 'bg-amber-50 border-amber-300 shadow-xl shadow-stone-200/50',
+            badgeClass: 'bg-amber-100 text-amber-800 border border-amber-300'
         }
     ];
     targetSections.forEach(section => {
@@ -360,9 +346,8 @@ function renderDashboard() {
                 }
                 const currentQty = item.quantity ?? 1;
                 const currentMultiplier = item.multiplier ?? 100;
-                const rowTotal = currentQty * currentMultiplier; // Исправлено умножение
+                const rowTotal = currentQty * currentMultiplier;
                 const currentNote = item.note ?? '';
-                // Проверяем, есть ли у товара второй PDF в справочнике
                 const catalogEntry = catalogDatabase.find(c => c.code === item.code);
                 let secondFileHtml = '';
                 if (catalogEntry?.pdfUrl2) {
@@ -373,13 +358,12 @@ function renderDashboard() {
                         ? 'bg-sky-50 hover:bg-sky-100 border-sky-200 text-sky-700'
                         : 'bg-rose-50 hover:bg-rose-100 border-rose-200 text-rose-600';
                     secondFileHtml = `
-    <a href="${catalogEntry.pdfUrl2}" target="_blank" title="Open Document" class="group flex items-center space-x-1 px-2.5 py-1.5 rounded-xl border transition-colors shrink-0 ${colorClasses}">
-      <span class="font-mono font-bold text-xs">${labelText}</span>
-      <span class="text-xs">${icon}</span>
-    </a>
-  `;
+            <a href="${catalogEntry.pdfUrl2}" target="_blank" title="Open Document" class="group flex items-center space-x-1 px-2.5 py-1.5 rounded-xl border transition-colors shrink-0 ${colorClasses}">
+              <span class="font-mono font-bold text-xs">${labelText}</span>
+              <span class="text-xs">${icon}</span>
+            </a>
+          `;
                 }
-                // Колонка пометки добавляется ТОЛЬКО для In Progress (process)
                 const noteColumnHtml = section.key === 'process'
                     ? `<div class="w-full xl:w-40 shrink-0">
                <input type="text" value="${currentNote}" data-id="${item.id}" data-field="note" placeholder="Note..." class="item-note-input w-full bg-stone-50 border border-stone-300 rounded-xl px-2.5 py-1.5 text-xs text-stone-800 focus:outline-none focus:border-blue-500 font-sans" />
@@ -387,23 +371,20 @@ function renderDashboard() {
                     : '';
                 tableContent += `
           <div data-id="${item.id}" class="draggable-row flex flex-col xl:flex-row items-start xl:items-center justify-between p-4 bg-white rounded-2xl border border-stone-200/80 border-l-4 ${borderAccentClass} shadow-sm transition-all hover:shadow-md gap-4">
-                      <div class="flex items-center space-x-3 w-full xl:w-auto overflow-hidden">
-              <!-- Кнопки перемещения вверх / вниз -->
+            <div class="flex items-center space-x-3 w-full xl:w-auto overflow-hidden">
               <div class="flex flex-col space-y-0.5 no-print">
                 <button onclick="moveItemUp(${item.id})" class="text-stone-400 hover:text-stone-700 text-xs px-1" title="Move Up">▲</button>
                 <button onclick="moveItemDown(${item.id})" class="text-stone-400 hover:text-stone-700 text-xs px-1" title="Move Down">▼</button>
               </div>
               
-              <!-- Нумерация позиции (1, 2, 3...) -->
               <span class="text-stone-600 font-bold text-xs w-7 h-7 flex items-center justify-center bg-stone-100 border border-stone-200 rounded-lg shrink-0">${index + 1}</span>
               
               <a href="${item.pdfUrl}" target="_blank" title="Open PDF" class="group flex items-center space-x-1.5 bg-stone-50 hover:bg-blue-50 px-3 py-1.5 rounded-xl border border-stone-200 transition-colors shrink-0">
-    <span class="font-mono font-bold text-blue-600 text-sm">${item.code}</span>
+                <span class="font-mono font-bold text-blue-600 text-sm">${item.code}</span>
                 <span class="text-xs text-stone-400 group-hover:text-blue-600">📄</span>
               </a>
               ${secondFileHtml}
 
-              </a>
               <div class="font-medium text-stone-800 text-sm md:text-base leading-snug truncate xl:truncate-none">
                 ${formatTitle(item.title)}
               </div>
@@ -433,7 +414,6 @@ function renderDashboard() {
         sectionDiv.innerHTML = tableContent;
         dashboardContainer.appendChild(sectionDiv);
     });
-    // 1. Привязка инпутов калькулятора (ВНУТРИ renderDashboard!)
     document.querySelectorAll('.item-calc-input').forEach(input => {
         input.addEventListener('change', async (e) => {
             const target = e.target;
@@ -455,7 +435,6 @@ function renderDashboard() {
             renderDashboard();
         });
     });
-    // 2. Привязка инпутов пометок (Note) (ВНУТРИ renderDashboard!)
     document.querySelectorAll('.item-note-input').forEach(input => {
         input.addEventListener('change', async (e) => {
             const target = e.target;
@@ -473,7 +452,6 @@ function renderDashboard() {
             }
         });
     });
-    // 3. Привязка кнопок удаления (.delete-btn) (ВНУТРИ renderDashboard!)
     document.querySelectorAll('.delete-btn').forEach(btn => {
         btn.addEventListener('click', async (e) => {
             const target = e.currentTarget;
@@ -502,9 +480,6 @@ function renderDashboard() {
         });
     });
 }
-// ==========================================
-// Функции управления порядком (стрелочки)
-// ==========================================
 window.moveItemUp = async function (itemId) {
     const item = items.find(i => i.id === itemId);
     if (!item)
@@ -557,9 +532,6 @@ async function saveOrderAndRefresh() {
     }
     renderDashboard();
 }
-// ==========================================
-// 5. Логика кнопки "Refresh"
-// ==========================================
 async function handleRefreshClick() {
     const refreshBtn = document.getElementById('refresh-btn');
     if (refreshBtn) {
@@ -601,8 +573,6 @@ async function handleRefreshClick() {
 if (refreshButton) {
     refreshButton.addEventListener('click', handleRefreshClick);
 }
-// ==========================================
-// 6. Запуск при старте страницы
-// ==========================================
 renderHeaderDate();
 fetchItemsFromSupabase();
+export {};

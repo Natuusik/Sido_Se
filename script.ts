@@ -1,7 +1,7 @@
 // ==========================================
 // 1. Инициализация и настройки Supabase
 // ==========================================
-export {}; // <--- Добавьте эту строчку
+export {}; // Требуется для module: commonjs
 declare const supabase: any;
 
 const SUPABASE_URL = 'https://vuppdvlpsbyzhcmalhoi.supabase.co';
@@ -18,7 +18,7 @@ interface CatalogItem {
   code: string;
   title: string;
   pdfUrl: string;
-  pdfUrl2?: string; // <-- Необязательный второй PDF
+  pdfUrl2?: string;
 }
 
 interface ProductionItem extends CatalogItem {
@@ -26,8 +26,8 @@ interface ProductionItem extends CatalogItem {
   status: 'ready' | 'process' | 'boxes';
   quantity?: number;
   multiplier?: number;
-  note?: string; // Поле для колонки пометок
-  sort_order?: number; // <--- Добавьте вот это поле
+  note?: string;
+  sort_order?: number;
 }
 
 const catalogDatabase: CatalogItem[] = [
@@ -55,15 +55,15 @@ const catalogDatabase: CatalogItem[] = [
   { code: "732021", title: "BXT 305x305 Square White", pdfUrl: "./docs/732021.pdf" },
   { code: "732024", title: "BXT Letter Portrait Black", pdfUrl: "./docs/732024.pdf" },
   { code: "732048", title: "BXT Black Special Endsheet 295 x 210 Landscape NSM", pdfUrl: "./docs/732048.pdf" },
-    { code: "732053", title: "BXT End sheet white 254 x 254 mm Square White", pdfUrl: "./docs/732053.pdf" },
+  { code: "732053", title: "BXT End sheet white 254 x 254 mm Square White", pdfUrl: "./docs/732053.pdf" },
   { code: "732054", title: "BXT End sheet white 254 x 254 mm Square Black", pdfUrl: "./docs/732054.pdf" },
 
-    { code: "714037", title: "Lazer Printable 329x500 50 pcs", pdfUrl: "./docs/714037.pdf" },
+  { code: "714037", title: "Lazer Printable 329x500 50 pcs", pdfUrl: "./docs/714037.pdf" },
   { code: "714039", title: "Lazer Printable 329x500 500 pcs", pdfUrl: "./docs/714039.pdf", pdfUrl2: "./docs/Laser_329x500_RedLebel.pdf" },
   { code: "714040", title: "Lazer Printable 329x660 250 pcs", pdfUrl: "./docs/714040.pdf" },
   { code: "714106", title: "Lazer Printable Lamifree 329x660 250 pcs", pdfUrl: "./docs/714106.pdf" },
   { code: "714041", title: "Inkjet Printable 329x530 50 pcs", pdfUrl: "./docs/714041.pdf" },
-   { code: "714043", title: "Inkjet Printable 329x530 500 pcs", pdfUrl: "./docs/714043.pdf" },
+  { code: "714043", title: "Inkjet Printable 329x530 500 pcs", pdfUrl: "./docs/714043.pdf" },
   { code: "714044", title: "Inkjet Printable 329x660 250 pcs", pdfUrl: "./docs/714044.pdf" },
 
   { code: "714047", title: "Grey Board A4 Portrait 207x302 / 2 mm", pdfUrl: "./docs/714047.pdf" },
@@ -82,7 +82,7 @@ const catalogDatabase: CatalogItem[] = [
   { code: "722007", title: "FM 333x230 White", pdfUrl: "./docs/722007.pdf" },
   { code: "722016", title: "FM 440x318 White", pdfUrl: "./docs/722016.pdf" },
 
-      { code: "707072", title: "Replaceable drain pan for ONE series (10 pcs)", pdfUrl: "./docs/707072.pdf" },
+  { code: "707072", title: "Replaceable drain pan for ONE series (10 pcs)", pdfUrl: "./docs/707072.pdf" },
   { code: "714020", title: "End Paper Pro HD 220x220mm White", pdfUrl: "./docs/714020.pdf" },
   { code: "714023", title: "End Paper Pro HD Letter Portrait White", pdfUrl: "./docs/714023.pdf" },
   { code: "714187", title: "End Paper A5 White", pdfUrl: "./docs/714187.pdf" },
@@ -92,16 +92,13 @@ const catalogDatabase: CatalogItem[] = [
   { code: "722029", title: "FM 210x290 White", pdfUrl: "./docs/722029.pdf" },
   { code: "722036", title: "FM 195x190 White", pdfUrl: "./docs/722036.pdf" },
   { code: "732048_Special", title: "BXT Landscape 295x210 Black", pdfUrl: "./docs/732048_Special.pdf" },
-
 ];
+
 let items: ProductionItem[] = [];
 let lastUpdateTime: Date | null = null;
 
 const dashboardContainer = document.getElementById('dashboard-container');
 
-// ==========================================
-// 2. Вспомогательные функции рендеринга
-// ==========================================
 function renderHeaderDate(): void {
   const dateContainer = document.getElementById('current-date');
   if (!dateContainer) return;
@@ -146,9 +143,6 @@ function formatTitle(title: string): string {
   });
 }
 
-// ==========================================
-// 3. Работа с Supabase (Загрузка задач + Время)
-// ==========================================
 async function fetchItemsFromSupabase(): Promise<void> {
   try {
     const { data: taskData, error: taskError } = await supabaseClient.from(TABLE_NAME).select('*');
@@ -178,21 +172,17 @@ async function fetchItemsFromSupabase(): Promise<void> {
   }
 }
 
-// Глобальная функция для кнопки "Done"
 (window as any).markAsReady = async function(itemId: number) {
   try {
-    // 1. Находим элемент в локальном массиве
     const item = items.find(i => i.id === itemId);
     if (!item) return;
 
-    // 2. Вычисляем следующий sort_order для секции 'ready' (чтобы встал в самый конец готовых)
     const readyItems = items.filter(i => i.status === 'ready');
     const maxSortOrder = readyItems.length > 0 
       ? Math.max(...readyItems.map(i => i.sort_order ?? 0)) 
       : -1;
     const newSortOrder = maxSortOrder + 1;
 
-    // 3. Обновляем статус и новый порядок в Supabase
     const { error } = await supabaseClient
       .from(TABLE_NAME)
       .update({ 
@@ -205,20 +195,19 @@ async function fetchItemsFromSupabase(): Promise<void> {
       console.error('Ошибка Supabase:', error);
       alert('Не удалось обновить статус: ' + error.message);
     } else {
-      // 4. Перезагружаем актуальные данные с сервера и перерисовываем дашборд
       await fetchItemsFromSupabase();
     }
   } catch (err) {
     console.error('Ошибка в markAsReady:', err);
   }
 };
-// Функция редактирования карточки (Карандашик)
+
 (window as any).editItemModal = function(itemId: number) {
   const item = items.find(i => i.id === itemId);
   if (!item) return;
 
   const newCode = prompt("Редактировать код товара:", item.code);
-  if (newCode === null) return; // Нажали отмену
+  if (newCode === null) return;
 
   const newTitle = prompt("Редактировать название товара:", item.title);
   if (newTitle === null) return;
@@ -231,7 +220,6 @@ async function fetchItemsFromSupabase(): Promise<void> {
     return;
   }
 
-  // Обновляем локально и в базе
   item.code = trimmedCode;
   item.title = trimmedTitle;
   item.pdfUrl = `./docs/${trimmedCode}.pdf`;
@@ -248,15 +236,11 @@ async function fetchItemsFromSupabase(): Promise<void> {
     });
 };
 
-// ==========================================
-// 4. Отрисовка дашборда и кнопок управления
-// ==========================================
 function renderDashboard(): void {
   if (!dashboardContainer) return;
 
   dashboardContainer.innerHTML = '';
 
-  // Форма добавления задачи
   const addFormContainer = document.createElement('div');
   addFormContainer.id = 'add-item-form-container';
   addFormContainer.className = 'bg-white rounded-2xl p-6 mb-8 border border-stone-200 shadow-md';
@@ -315,7 +299,6 @@ function renderDashboard(): void {
       const catalogMatch = catalogDatabase.find(i => i.code === code);
       const resolvedPdfUrl = catalogMatch ? catalogMatch.pdfUrl : `./docs/${code}.pdf`;
 
-      // Вычисляем следующий порядковый номер для секции 'process'
       const processItems = items.filter(i => i.status === 'process');
       const maxSortOrder = processItems.length > 0
         ? Math.max(...processItems.map(i => i.sort_order ?? 0))
@@ -331,7 +314,7 @@ function renderDashboard(): void {
         quantity: 1,
         multiplier: 100,
         note: '',
-        sort_order: newSortOrder // <-- Добавляем порядковый номер в конец списка
+        sort_order: newSortOrder
       };
 
       const { error } = await supabaseClient.from(TABLE_NAME).insert([newItem]);
@@ -358,13 +341,19 @@ function renderDashboard(): void {
       title: '🛠️ In Progress', 
       bgClass: 'bg-blue-50 border-blue-300 shadow-xl shadow-stone-200/50', 
       badgeClass: 'bg-blue-100 text-blue-800 border border-blue-300' 
+    },
+    { 
+      key: 'boxes', 
+      title: '📦 Boxes & Packaging', 
+      bgClass: 'bg-amber-50 border-amber-300 shadow-xl shadow-stone-200/50', 
+      badgeClass: 'bg-amber-100 text-amber-800 border border-amber-300' 
     }
   ];
 
   targetSections.forEach(section => {
-   const groupItems = items
-  .filter(item => item.status === section.key)
-  .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+    const groupItems = items
+      .filter(item => item.status === section.key)
+      .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
     const count = groupItems.length;
     
     const sectionDiv = document.createElement('div');
@@ -414,29 +403,28 @@ function renderDashboard(): void {
 
         const currentQty = item.quantity ?? 1;
         const currentMultiplier = item.multiplier ?? 100;
-        const rowTotal = currentQty * currentMultiplier; // Исправлено умножение
+        const rowTotal = currentQty * currentMultiplier;
         const currentNote = item.note ?? '';
-// Проверяем, есть ли у товара второй PDF в справочнике
-const catalogEntry = catalogDatabase.find(c => c.code === item.code);
 
-let secondFileHtml = '';
-if (catalogEntry?.pdfUrl2) {
-  const isWord = catalogEntry.pdfUrl2.toLowerCase().endsWith('.doc') || catalogEntry.pdfUrl2.toLowerCase().endsWith('.docx');
-  const labelText = isWord ? 'Word' : 'Label';
-  const icon = isWord ? '📝' : '📄';
-  const colorClasses = isWord 
-    ? 'bg-sky-50 hover:bg-sky-100 border-sky-200 text-sky-700' 
-    : 'bg-rose-50 hover:bg-rose-100 border-rose-200 text-rose-600';
+        const catalogEntry = catalogDatabase.find(c => c.code === item.code);
 
-  secondFileHtml = `
-    <a href="${catalogEntry.pdfUrl2}" target="_blank" title="Open Document" class="group flex items-center space-x-1 px-2.5 py-1.5 rounded-xl border transition-colors shrink-0 ${colorClasses}">
-      <span class="font-mono font-bold text-xs">${labelText}</span>
-      <span class="text-xs">${icon}</span>
-    </a>
-  `;
-}
+        let secondFileHtml = '';
+        if (catalogEntry?.pdfUrl2) {
+          const isWord = catalogEntry.pdfUrl2.toLowerCase().endsWith('.doc') || catalogEntry.pdfUrl2.toLowerCase().endsWith('.docx');
+          const labelText = isWord ? 'Word' : 'Label';
+          const icon = isWord ? '📝' : '📄';
+          const colorClasses = isWord 
+            ? 'bg-sky-50 hover:bg-sky-100 border-sky-200 text-sky-700' 
+            : 'bg-rose-50 hover:bg-rose-100 border-rose-200 text-rose-600';
 
-        // Колонка пометки добавляется ТОЛЬКО для In Progress (process)
+          secondFileHtml = `
+            <a href="${catalogEntry.pdfUrl2}" target="_blank" title="Open Document" class="group flex items-center space-x-1 px-2.5 py-1.5 rounded-xl border transition-colors shrink-0 ${colorClasses}">
+              <span class="font-mono font-bold text-xs">${labelText}</span>
+              <span class="text-xs">${icon}</span>
+            </a>
+          `;
+        }
+
         const noteColumnHtml = section.key === 'process' 
           ? `<div class="w-full xl:w-40 shrink-0">
                <input type="text" value="${currentNote}" data-id="${item.id}" data-field="note" placeholder="Note..." class="item-note-input w-full bg-stone-50 border border-stone-300 rounded-xl px-2.5 py-1.5 text-xs text-stone-800 focus:outline-none focus:border-blue-500 font-sans" />
@@ -445,23 +433,20 @@ if (catalogEntry?.pdfUrl2) {
 
         tableContent += `
           <div data-id="${item.id}" class="draggable-row flex flex-col xl:flex-row items-start xl:items-center justify-between p-4 bg-white rounded-2xl border border-stone-200/80 border-l-4 ${borderAccentClass} shadow-sm transition-all hover:shadow-md gap-4">
-                      <div class="flex items-center space-x-3 w-full xl:w-auto overflow-hidden">
-              <!-- Кнопки перемещения вверх / вниз -->
+            <div class="flex items-center space-x-3 w-full xl:w-auto overflow-hidden">
               <div class="flex flex-col space-y-0.5 no-print">
                 <button onclick="moveItemUp(${item.id})" class="text-stone-400 hover:text-stone-700 text-xs px-1" title="Move Up">▲</button>
                 <button onclick="moveItemDown(${item.id})" class="text-stone-400 hover:text-stone-700 text-xs px-1" title="Move Down">▼</button>
               </div>
               
-              <!-- Нумерация позиции (1, 2, 3...) -->
               <span class="text-stone-600 font-bold text-xs w-7 h-7 flex items-center justify-center bg-stone-100 border border-stone-200 rounded-lg shrink-0">${index + 1}</span>
               
               <a href="${item.pdfUrl}" target="_blank" title="Open PDF" class="group flex items-center space-x-1.5 bg-stone-50 hover:bg-blue-50 px-3 py-1.5 rounded-xl border border-stone-200 transition-colors shrink-0">
-    <span class="font-mono font-bold text-blue-600 text-sm">${item.code}</span>
+                <span class="font-mono font-bold text-blue-600 text-sm">${item.code}</span>
                 <span class="text-xs text-stone-400 group-hover:text-blue-600">📄</span>
               </a>
               ${secondFileHtml}
 
-              </a>
               <div class="font-medium text-stone-800 text-sm md:text-base leading-snug truncate xl:truncate-none">
                 ${formatTitle(item.title)}
               </div>
@@ -490,11 +475,10 @@ if (catalogEntry?.pdfUrl2) {
       tableContent += `</div>`;
     }
 
-      sectionDiv.innerHTML = tableContent;
+    sectionDiv.innerHTML = tableContent;
     dashboardContainer.appendChild(sectionDiv);
   });
 
-  // 1. Привязка инпутов калькулятора (ВНУТРИ renderDashboard!)
   document.querySelectorAll('.item-calc-input').forEach(input => {
     input.addEventListener('change', async (e) => {
       const target = e.target as HTMLInputElement;
@@ -519,7 +503,6 @@ if (catalogEntry?.pdfUrl2) {
     });
   });
 
-  // 2. Привязка инпутов пометок (Note) (ВНУТРИ renderDashboard!)
   document.querySelectorAll('.item-note-input').forEach(input => {
     input.addEventListener('change', async (e) => {
       const target = e.target as HTMLInputElement;
@@ -539,7 +522,6 @@ if (catalogEntry?.pdfUrl2) {
     });
   });
 
-  // 3. Привязка кнопок удаления (.delete-btn) (ВНУТРИ renderDashboard!)
   document.querySelectorAll('.delete-btn').forEach(btn => {
     btn.addEventListener('click', async (e) => {
       const target = e.currentTarget as HTMLButtonElement;
@@ -566,12 +548,8 @@ if (catalogEntry?.pdfUrl2) {
       }
     });
   });
-} 
+}
 
-
-// ==========================================
-// Функции управления порядком (стрелочки)
-// ==========================================
 (window as any).moveItemUp = async function(itemId: number) {
   const item = items.find(i => i.id === itemId);
   if (!item) return;
@@ -634,9 +612,6 @@ async function saveOrderAndRefresh() {
   renderDashboard();
 }
 
-// ==========================================
-// 5. Логика кнопки "Refresh"
-// ==========================================
 async function handleRefreshClick(): Promise<void> {
   const refreshBtn = document.getElementById('refresh-btn') as HTMLButtonElement | null;
   if (refreshBtn) {
@@ -681,8 +656,5 @@ if (refreshButton) {
   refreshButton.addEventListener('click', handleRefreshClick);
 }
 
-// ==========================================
-// 6. Запуск при старте страницы
-// ==========================================
 renderHeaderDate();
 fetchItemsFromSupabase();
