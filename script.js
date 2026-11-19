@@ -161,22 +161,28 @@ window.markAsReady = async function (itemId) {
         console.error('Ошибка в markAsReady:', err);
     }
 };
-window.restoreItem = async function (itemId) {
+// Функция отмены удаления (возврат последнего удаленного элемента)
+window.undoLastDelete = async function () {
+    const deletedItems = items.filter(i => i.status === 'deleted');
+    if (deletedItems.length === 0)
+        return;
+    // Берем последний удаленный (по ID или времени)
+    const lastDeleted = deletedItems[deletedItems.length - 1];
     try {
         const { error } = await supabaseClient
             .from(TABLE_NAME)
             .update({ status: 'process' })
-            .eq('id', itemId);
+            .eq('id', lastDeleted.id);
         if (error) {
-            console.error('Ошибка восстановления:', error);
-            alert('Не удалось восстановить: ' + error.message);
+            console.error('Ошибка отмены удаления:', error);
+            alert('Не удалось восстановить позицию: ' + error.message);
         }
         else {
             await fetchItemsFromSupabase();
         }
     }
     catch (err) {
-        console.error('Ошибка в restoreItem:', err);
+        console.error('Ошибка в undoLastDelete:', err);
     }
 };
 window.editItemModal = function (itemId) {
@@ -295,6 +301,7 @@ function renderDashboard() {
             }
         });
     }
+    // Оставляем только нужные рабочие секции (без блока boxes и без отдельного блока deleted)
     const targetSections = [
         {
             key: 'ready',
@@ -307,14 +314,10 @@ function renderDashboard() {
             title: '🛠️ In Progress',
             bgClass: 'bg-blue-50 border-blue-300 shadow-xl shadow-stone-200/50',
             badgeClass: 'bg-blue-100 text-blue-800 border border-blue-300'
-        },
-        {
-            key: 'deleted',
-            title: '🗑️ Trash (Корзина)',
-            bgClass: 'bg-stone-200/60 border-stone-300 shadow-sm',
-            badgeClass: 'bg-stone-300 text-stone-700 border border-stone-400'
         }
     ];
+    // Проверяем, есть ли что возвращать в корзине
+    const hasDeletedItems = items.filter(i => i.status === 'deleted').length > 0;
     targetSections.forEach(section => {
         const groupItems = items
             .filter(item => item.status === section.key)
@@ -323,8 +326,13 @@ function renderDashboard() {
         const sectionDiv = document.createElement('div');
         sectionDiv.id = `${section.key}-section`;
         sectionDiv.className = `rounded-3xl p-4 md:p-8 border mb-8 ${section.bgClass}`;
-        const actionButtonsHtml = (count > 0 && section.key !== 'deleted')
+        // Кнопка возврата (Undo) появляется рядом с принтом и вордом, если есть удаленные элементы
+        const undoButtonHtml = hasDeletedItems
+            ? `<button onclick="undoLastDelete()" class="bg-amber-600 hover:bg-amber-700 text-white text-xs px-3.5 py-2 rounded-xl font-medium transition-colors shadow-sm flex items-center space-x-1" title="Вернуть последнее удаление"><span>↩️ Undo</span></button>`
+            : '';
+        const actionButtonsHtml = (count > 0 || hasDeletedItems)
             ? `<div class="flex flex-wrap items-center gap-2 no-print">
+          ${undoButtonHtml}
           <button id="print-${section.key}-table" class="bg-stone-800 hover:bg-stone-900 text-white text-xs px-3.5 py-2 rounded-xl font-medium transition-colors shadow-sm flex items-center space-x-1"><span>🖨️ Print / PDF</span></button>
           <button id="copy-${section.key}-table" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3.5 py-2 rounded-xl font-medium transition-colors shadow-sm flex items-center space-x-1"><span>📋 To Word</span></button>
          </div>`
@@ -347,9 +355,6 @@ function renderDashboard() {
                 let actionButton = '';
                 if (section.key === 'process') {
                     actionButton = `<button onclick="markAsReady(${item.id})" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-xl text-xs font-semibold transition-colors shadow-sm shrink-0">✅ Done</button>`;
-                }
-                else if (section.key === 'deleted') {
-                    actionButton = `<button onclick="restoreItem(${item.id})" class="bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-2 rounded-xl text-xs font-semibold transition-colors shadow-sm shrink-0 flex items-center space-x-1"><span>↩️ Restore</span></button>`;
                 }
                 const text = `${item.title} ${item.code}`.toUpperCase();
                 let borderAccentClass = 'border-l-stone-300';
@@ -390,13 +395,6 @@ function renderDashboard() {
                <input type="text" value="${currentNote}" data-id="${item.id}" data-field="note" placeholder="Note..." class="item-note-input w-full bg-stone-50 border border-stone-300 rounded-xl px-2.5 py-1.5 text-xs text-stone-800 focus:outline-none focus:border-blue-500 font-sans" />
              </div>`
                     : '';
-                let deleteButtonHtml = '';
-                if (section.key !== 'deleted') {
-                    deleteButtonHtml = `
-            <button onclick="editItemModal(${item.id})" class="bg-stone-50 hover:bg-amber-50 text-stone-400 hover:text-amber-600 border border-stone-200 p-2 rounded-xl text-xs transition-colors shadow-xs" title="Edit item">✏️</button>
-            <button class="delete-btn bg-stone-50 hover:bg-rose-50 text-stone-400 hover:text-rose-600 border border-stone-200 p-2 rounded-xl text-xs transition-colors shadow-xs" data-id="${item.id}" title="Delete item">🗑️</button>
-          `;
-                }
                 tableContent += `
           <div data-id="${item.id}" class="draggable-row flex flex-col xl:flex-row items-start xl:items-center justify-between p-4 bg-white rounded-2xl border border-stone-200/80 border-l-4 ${borderAccentClass} shadow-sm transition-all hover:shadow-md gap-4">
             <div class="flex items-center space-x-3 w-full xl:w-auto overflow-hidden">
@@ -430,7 +428,8 @@ function renderDashboard() {
 
               <div class="flex items-center space-x-2 no-print">
                 ${actionButton}
-                ${deleteButtonHtml}
+                <button onclick="editItemModal(${item.id})" class="bg-stone-50 hover:bg-amber-50 text-stone-400 hover:text-amber-600 border border-stone-200 p-2 rounded-xl text-xs transition-colors shadow-xs" title="Edit item">✏️</button>
+                <button class="delete-btn bg-stone-50 hover:bg-rose-50 text-stone-400 hover:text-rose-600 border border-stone-200 p-2 rounded-xl text-xs transition-colors shadow-xs" data-id="${item.id}" title="Delete item">🗑️</button>
               </div>
             </div>
           </div>
@@ -488,7 +487,7 @@ function renderDashboard() {
             const item = items.find(i => i.id === id);
             if (!item)
                 return;
-            if (!confirm(`Отправить в корзину позицию "${item.title}"?`))
+            if (!confirm(`Удалить позицию "${item.title}"? (Её можно будет вернуть кнопкой Undo сверху)`))
                 return;
             try {
                 const { error } = await supabaseClient
@@ -496,8 +495,8 @@ function renderDashboard() {
                     .update({ status: 'deleted' })
                     .eq('id', id);
                 if (error) {
-                    console.error('Ошибка перемещения в корзину:', error);
-                    alert('Не удалось переместить в корзину: ' + error.message);
+                    console.error('Ошибка удаления:', error);
+                    alert('Не удалось удалить: ' + error.message);
                 }
                 else {
                     item.status = 'deleted';
@@ -563,10 +562,9 @@ async function saveOrderAndRefresh() {
     renderDashboard();
 }
 async function handleRefreshClick() {
-    const refreshBtn = document.getElementById('refresh-btn');
-    if (refreshBtn) {
-        refreshBtn.disabled = true;
-        refreshBtn.style.opacity = '0.6';
+    if (refreshButton) {
+        refreshButton.disabled = true;
+        refreshButton.style.opacity = '0.6';
     }
     const now = new Date();
     try {
@@ -594,14 +592,11 @@ async function handleRefreshClick() {
         console.error('Ошибка рефреша:', err);
     }
     finally {
-        if (refreshBtn) {
-            refreshBtn.disabled = false;
-            refreshBtn.style.opacity = '1';
+        if (refreshButton) {
+            refreshButton.disabled = false;
+            refreshButton.style.opacity = '1';
         }
     }
-}
-if (refreshButton) {
-    refreshButton.addEventListener('click', handleRefreshClick);
 }
 renderHeaderDate();
 fetchItemsFromSupabase();
